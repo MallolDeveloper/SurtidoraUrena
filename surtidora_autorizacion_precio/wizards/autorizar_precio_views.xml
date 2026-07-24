@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_autorizar_precio_wizard_form" model="ir.ui.view">
+        <field name="name">surtidora.autorizar.precio.wizard.form</field>
+        <field name="model">surtidora.autorizar.precio.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Autorizar precios">
+                <field name="order_id" invisible="1"/>
+                <field name="linea_ids" nolabel="1">
+                    <list create="false" delete="false">
+                        <field name="product_id"/>
+                        <field name="uom_id"/>
+                        <field name="cantidad"/>
+                        <field name="precio_lista"/>
+                        <field name="precio_propuesto"/>
+                        <field name="bajo_costo" decoration-danger="bajo_costo"/>
+                        <field name="currency_id" column_invisible="1"/>
+                    </list>
+                </field>
+                <group>
+                    <field name="pin" password="True"/>
+                    <field name="nota"/>
+                </group>
+                <footer>
+                    <button name="action_autorizar" type="object" string="Autorizar" class="btn-primary"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

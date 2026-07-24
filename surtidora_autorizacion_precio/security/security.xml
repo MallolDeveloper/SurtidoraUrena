@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_autorizador_precio" model="res.groups">
+        <field name="name">Autorizador de Precios</field>
+        <field name="comment">Puede aprobar con su PIN ventas por debajo del precio de lista (RB-01). Asignar a los supervisores (Adelso, Mariano, Hipólito).</field>
+    </record>
+
+    <record id="rule_autorizacion_precio_company" model="ir.rule">
+        <field name="name">Autorizaciones de precio: multi-compañía</field>
+        <field name="model_id" ref="model_surtidora_autorizacion_precio"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>
