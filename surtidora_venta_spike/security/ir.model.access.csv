@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_negociacion_wizard,surtidora.negociacion.wizard,model_surtidora_negociacion_wizard,base.group_user,1,1,1,1
+access_negociacion_precio,surtidora.negociacion.precio,model_surtidora_negociacion_precio,base.group_user,1,1,1,1
+access_negociacion_stock,surtidora.negociacion.stock,model_surtidora_negociacion_stock,base.group_user,1,1,1,1
+access_negociacion_historial,surtidora.negociacion.historial,model_surtidora_negociacion_historial,base.group_user,1,1,1,1
