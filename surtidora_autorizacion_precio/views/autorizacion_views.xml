@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_autorizacion_precio_list" model="ir.ui.view">
+        <field name="name">surtidora.autorizacion.precio.list</field>
+        <field name="model">surtidora.autorizacion.precio</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false">
+                <field name="create_date" string="Fecha"/>
+                <field name="order_ref"/>
+                <field name="partner_id"/>
+                <field name="product_id"/>
+                <field name="uom_id"/>
+                <field name="cantidad"/>
+                <field name="precio_lista"/>
+                <field name="precio_autorizado"/>
+                <field name="solicitante_id"/>
+                <field name="autorizador_id"/>
+                <field name="nota" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_autorizacion_precio" model="ir.actions.act_window">
+        <field name="name">Autorizaciones de precio</field>
+        <field name="res_model">surtidora.autorizacion.precio</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin autorizaciones registradas</p>
+            <p>Aquí queda la auditoría de cada rebaja de precio aprobada con PIN de supervisor.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_autorizacion_precio"
+              name="Autorizaciones de precio"
+              parent="sale.sale_menu_root"
+              action="action_autorizacion_precio"
+              groups="sales_team.group_sale_manager,surtidora_autorizacion_precio.group_autorizador_precio"
+              sequence="90"/>
+</odoo>

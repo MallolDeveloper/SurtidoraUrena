@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_autorizacion_user,surtidora.autorizacion.precio user,model_surtidora_autorizacion_precio,base.group_user,1,0,0,0
+access_autorizacion_admin,surtidora.autorizacion.precio admin,model_surtidora_autorizacion_precio,sales_team.group_sale_manager,1,1,0,0
+access_wizard,surtidora.autorizar.precio.wizard,model_surtidora_autorizar_precio_wizard,base.group_user,1,1,1,1
+access_wizard_linea,surtidora.autorizar.precio.linea,model_surtidora_autorizar_precio_linea,base.group_user,1,1,1,1
