@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_cedula_barcode" model="ir.ui.view">
+        <field name="name">res.partner.form.cedula.barcode</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="barcode" string="Código cédula/tarjeta (POS)"
+                       help="Código de barras del reverso de la cédula o de la tarjeta de lealtad. Al escanearlo en el POS, el cliente queda asignado a la orden (REQ-V29)."/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
