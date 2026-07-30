@@ -14,6 +14,19 @@ operación real el **45% de las líneas** se vende en empaques (docena/caja/fard
 La línea queda en unidad base (18 Paquete × 48.89 = 880.00) — así modela el POS
 de Odoo internamente; el ticket cuadra al centavo.
 
+## Fraccionamiento (v1.1 — RB-09 / REQ-V23)
+
+Si el producto tiene activo **"La caja se fracciona (¼/½/¾)"** (ficha del
+producto), el popup ofrece además las fracciones del empaque **a precio de
+caja**: ½ caja de 18 = 9 und a 440.00 (tarifa caja 48.89), no a precio suelto.
+
+- Solo se ofrecen fracciones que den unidades base ENTERAS (caja de 24 →
+  6/12/18; caja de 18 → solo ½=9). Decisión de coherencia física, validar
+  con el cliente.
+- La línea lleva `price_type = manual` para que el POS no recalcule la
+  fracción a precio suelto.
+- La unidad base NUNCA se fracciona (RB-09).
+
 ## Diseño
 
 - `models/pos_load.py`: agrega `relative_factor`/`relative_uom_id` (uom.uom) y
