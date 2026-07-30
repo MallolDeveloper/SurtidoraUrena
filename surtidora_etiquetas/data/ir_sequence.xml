@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="seq_barcode_interno" model="ir.sequence">
+        <field name="name">Código de barras interno (Surtidora)</field>
+        <field name="code">surtidora.barcode.interno</field>
+        <field name="padding">10</field>
+        <field name="implementation">standard</field>
+    </record>
+</odoo>
