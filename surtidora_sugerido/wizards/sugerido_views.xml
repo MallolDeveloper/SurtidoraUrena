@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sugerido_form" model="ir.ui.view">
+        <field name="name">surtidora.sugerido.form</field>
+        <field name="model">surtidora.sugerido</field>
+        <field name="arch" type="xml">
+            <form string="Sugerido de Compras">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Sugerido de compras por rotación de ventas</h2>
+                        <p class="text-muted">Los costos del producto NO incluyen ITBIS</p>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="suplidor_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="fecha_desde"/>
+                            <field name="fecha_hasta"/>
+                            <field name="dias_abastecer"/>
+                        </group>
+                    </group>
+                    <div class="mb-2">
+                        <button name="action_calcular" type="object" string="Calcular sugerido" class="btn-primary"/>
+                        <button name="action_ordenar_lo_sugerido" type="object" string="Ordenar lo sugerido" class="btn-secondary" invisible="not line_ids"/>
+                        <button name="action_quitar_cantidades" type="object" string="Quitar cantidades" class="btn-secondary" invisible="not line_ids"/>
+                    </div>
+                    <field name="line_ids" nolabel="1">
+                        <list editable="bottom" create="0" delete="0" default_order="cant_sugerida desc">
+                            <field name="referencia" optional="show"/>
+                            <field name="product_id" readonly="1"/>
+                            <field name="uom_compra_id" readonly="1"/>
+                            <field name="ref_suplidor" optional="show"/>
+                            <field name="fecha_ultima_compra" optional="show"/>
+                            <field name="cantidad_ultima_compra" optional="hide"/>
+                            <field name="existencia_actual" readonly="1"/>
+                            <field name="salidas_periodo" optional="show"/>
+                            <field name="ventas_dia" readonly="1"/>
+                            <field name="ordenes_pendientes" readonly="1"/>
+                            <field name="cant_necesaria" readonly="1"/>
+                            <field name="cant_sugerida" readonly="1"
+                                   decoration-success="cant_sugerida &gt; 0"
+                                   decoration-muted="cant_sugerida &lt;= 0"/>
+                            <field name="cantidad_ordenar"/>
+                            <field name="costo_uom_compra" optional="show"/>
+                        </list>
+                    </field>
+                </sheet>
+                <footer>
+                    <button name="action_oc_temporal" type="object" string="Guardar OC temporal" class="btn-secondary"
+                            help="Borrador marcado como temporal — la negociación con el vendedor sigue abierta"/>
+                    <button name="action_oc_firme" type="object" string="Generar OC firme" class="btn-primary"
+                            help="Crea y CONFIRMA la orden — compromiso con el suplidor"/>
+                    <button string="Salir" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sugerido" model="ir.actions.act_window">
+        <field name="name">Sugerido de Compras</field>
+        <field name="res_model">surtidora.sugerido</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+
+    <menuitem id="menu_sugerido" name="Sugerido (Surtidora)"
+              parent="purchase.menu_purchase_root"
+              action="action_sugerido" sequence="16"
+              groups="purchase.group_purchase_user"/>
+</odoo>
