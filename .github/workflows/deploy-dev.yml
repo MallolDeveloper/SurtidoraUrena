@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
 
+# Los deploys hacen fila en vez de pisarse: dos merges seguidos lanzaban
+# dos veces deploy.sh a la vez sobre el mismo Odoo y se mataban entre sí
+# (exit 137). cancel-in-progress: false = ninguno se descarta, esperan turno.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
