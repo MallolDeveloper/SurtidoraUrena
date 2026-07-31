@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_generar_codigo_interno" model="ir.actions.server">
+        <field name="name">Generar código interno (sin código)</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_generar_codigo_interno()</field>
+    </record>
+
+    <record id="action_abrir_etiquetas_wizard" model="ir.actions.act_window">
+        <field name="name">Imprimir etiquetas (base + empaques)</field>
+        <field name="res_model">surtidora.etiquetas.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list,form</field>
+    </record>
+</odoo>

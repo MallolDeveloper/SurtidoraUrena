@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_etiqueta_57x32" model="report.paperformat">
+        <field name="name">Etiqueta 57x32mm (rollo)</field>
+        <field name="format">custom</field>
+        <field name="page_width">57</field>
+        <field name="page_height">32</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">2</field>
+        <field name="margin_bottom">2</field>
+        <field name="margin_left">2</field>
+        <field name="margin_right">2</field>
+        <field name="dpi">203</field>
+    </record>
+
+    <record id="action_report_etiquetas" model="ir.actions.report">
+        <field name="name">Etiquetas de productos y empaques</field>
+        <field name="model">surtidora.etiquetas.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">surtidora_etiquetas.report_etiquetas</field>
+        <field name="paperformat_id" ref="paperformat_etiqueta_57x32"/>
+    </record>
+
+    <template id="report_etiquetas">
+        <t t-call="web.basic_layout">
+            <t t-foreach="etiquetas" t-as="e">
+                <div class="page" style="page-break-after: always; font-family: sans-serif; text-align: center;">
+                    <div style="font-size: 9px; font-weight: bold; height: 22px; overflow: hidden; line-height: 1.1;">
+                        <t t-esc="e['nombre']"/>
+                    </div>
+                    <div style="font-size: 8px;">
+                        <t t-esc="e['referencia']"/> · <t t-esc="e['unidad']"/>
+                    </div>
+                    <div style="font-size: 14px; font-weight: bold;">
+                        RD$ <t t-esc="'%.2f' % e['precio']"/>
+                    </div>
+                    <t t-if="e['barcode']">
+                        <img t-att-src="'/report/barcode/?barcode_type=EAN13&amp;value=%s&amp;width=400&amp;height=60&amp;humanreadable=1' % e['barcode']"
+                             style="width: 48mm; height: 9mm;"/>
+                    </t>
+                    <t t-else="">
+                        <div style="font-size: 8px; color: #888;">(sin código — generar código interno)</div>
+                    </t>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
