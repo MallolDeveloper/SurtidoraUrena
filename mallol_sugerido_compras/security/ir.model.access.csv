@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sugerido_compras,mallol.sugerido.compras,model_mallol_sugerido_compras,purchase.group_purchase_user,1,1,1,1
+access_sugerido_compras_line,mallol.sugerido.compras.line,model_mallol_sugerido_compras_line,purchase.group_purchase_user,1,1,1,1
