@@ -16,7 +16,7 @@ Iteración 1 (REQ-C01→C04, C07):
 Iteración 2: paneles de contexto (histórico mensual compras vs ventas,
 multi-suplidor). Iteración 3: impresión en 2 copias.
     """,
-    'version': '19.0.1.0.0',
+    'version': '19.0.2.0.0',
     'category': 'Inventory/Purchase',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
@@ -26,6 +26,7 @@ multi-suplidor). Iteración 3: impresión en 2 copias.
         'views/product_template_views.xml',
         'views/purchase_order_views.xml',
         'wizards/sugerido_views.xml',
+        'wizards/detalle_views.xml',
     ],
     'installable': True,
     'application': True,

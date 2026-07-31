@@ -1,3 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_sugerido,surtidora.sugerido,model_surtidora_sugerido,purchase.group_purchase_user,1,1,1,1
 access_sugerido_line,surtidora.sugerido.line,model_surtidora_sugerido_line,purchase.group_purchase_user,1,1,1,1
+access_detalle,surtidora.sugerido.detalle,model_surtidora_sugerido_detalle,purchase.group_purchase_user,1,1,1,1
+access_detalle_mes,surtidora.sugerido.detalle.mes,model_surtidora_sugerido_detalle_mes,purchase.group_purchase_user,1,1,1,1
+access_detalle_compra,surtidora.sugerido.detalle.compra,model_surtidora_sugerido_detalle_compra,purchase.group_purchase_user,1,1,1,1
+access_detalle_oc,surtidora.sugerido.detalle.oc,model_surtidora_sugerido_detalle_oc,purchase.group_purchase_user,1,1,1,1

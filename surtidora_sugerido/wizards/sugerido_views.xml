@@ -44,6 +44,8 @@
                                    decoration-muted="cant_sugerida &lt;= 0"/>
                             <field name="cantidad_ordenar"/>
                             <field name="costo_uom_compra" optional="show"/>
+                            <button name="action_ver_detalle" type="object" icon="fa-info-circle"
+                                    title="Información del producto: histórico mensual, últimas compras y OC pendientes"/>
                         </list>
                     </field>
                 </sheet>
