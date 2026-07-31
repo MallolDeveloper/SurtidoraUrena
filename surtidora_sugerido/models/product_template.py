@@ -8,4 +8,4 @@ class ProductTemplate(models.Model):
     surtidora_uom_compra_id = fields.Many2one(
         'uom.uom', string='Unidad de compra (sugerido)',
         help='REQ-C03: la "definida de compra" de ADG — el sugerido analiza y '
-             'ordena en esta unidad (caja/fardo). Vacía = unidad base.')
+             'ordena en esta unidad (caja/fardo). Vacío = unidad base.')
