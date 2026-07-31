@@ -138,3 +138,30 @@ class SugeridoLine(models.TransientModel):
         string='Costo (sin ITBIS)', readonly=True, digits='Product Price',
         help='Costo en la unidad de compra. SIN ITBIS — como lo presenta el '
              'sugerido del sistema actual.')
+
+    def action_ver_detalle(self):
+        """Abre el panel de información del producto (captura 14): histórico
+        mensual compras vs ventas, últimas compras multi-suplidor y OC
+        pendientes. El motor arma los datos; el popup solo los muestra."""
+        self.ensure_one()
+        motor = self.env['surtidora.sugerido.motor']
+        producto = self.product_id
+        company = self.wizard_id.company_id
+        info = motor.detalle_producto(producto, company, self.wizard_id.dias_abastecer)
+        detalle = self.env['surtidora.sugerido.detalle'].create({
+            'product_id': producto.id,
+            'uom_base_name': producto.uom_id.name,
+            'mes_ids': [(0, 0, m) for m in motor.matriz_mensual(producto, company)],
+            'compra_ids': [(0, 0, {k: v for k, v in c.items() if k != 'costo_base'})
+                           for c in motor._ultimas_compras(producto, company)],
+            'oc_ids': [(0, 0, o) for o in motor._oc_pendientes_producto(producto, company)],
+            **info,
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': producto.display_name,
+            'res_model': 'surtidora.sugerido.detalle',
+            'res_id': detalle.id,
+            'view_mode': 'form',
+            'target': 'new',
+        }

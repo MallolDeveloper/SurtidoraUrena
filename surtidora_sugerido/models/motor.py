@@ -10,7 +10,9 @@ Convención de unidades: TODO se presenta en la UNIDAD DE COMPRA del producto
 (REQ-C03), como en la pantalla de ADG. Los costos van SIN ITBIS (así los
 guarda la base y así los presenta el sugerido del cliente).
 """
-from odoo import _, models
+from dateutil.relativedelta import relativedelta
+
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
@@ -144,3 +146,147 @@ class SugeridoMotor(models.AbstractModel):
              ('product_tmpl_id', 'in', productos.product_tmpl_id.ids)],
             ['product_tmpl_id', 'product_code'])
         return {i['product_tmpl_id'][0]: i['product_code'] or '' for i in infos}
+
+    # ------------------------------------------------------------------
+    # Detalle del producto seleccionado (iteración 2 — REQ-C05/C06)
+    # ------------------------------------------------------------------
+    MESES = ('Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+             'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic')
+
+    def detalle_producto(self, producto, company, dias_abastecer):
+        """Panel "Información del producto seleccionado" de la captura 14."""
+        producto = producto.with_company(company)
+        ultima = self._ultimas_compras(producto, company, limite=1)
+        ultima = ultima[0] if ultima else {}
+        hoy = fields.Date.context_today(self)
+        dias_desde = (hoy - ultima['fecha'].date()).days if ultima.get('fecha') else 0
+        return {
+            'ultimo_costo_base': ultima.get('costo_base', 0.0),
+            'costo_promedio': producto.standard_price,
+            'dias_desde_compra': dias_desde,
+            'existencia_actual': producto.qty_available,
+            'dev_ventas': self._devoluciones(producto, company, de_ventas=True),
+            'dev_compras': self._devoluciones(producto, company, de_ventas=False),
+        }
+
+    def matriz_mensual(self, producto, company, meses=12):
+        """Matriz mensual comprado vs vendido, en unidad base (REQ-C05).
+
+        El argumento de Adelso contra pedidos inflados: "usted vende mucho de
+        esto" → "mentira, una caja mensual"."""
+        hoy = fields.Date.context_today(self)
+        inicio = hoy.replace(day=1) - relativedelta(months=meses - 1)
+
+        vendidas = self._lineas_con_fecha(
+            'sale.order.line', producto, company,
+            [('order_id.state', '=', 'sale'), ('order_id.date_order', '>=', inicio)],
+            'product_uom_qty', 'product_uom_id')
+        compradas = self._lineas_con_fecha(
+            'purchase.order.line', producto, company,
+            [('order_id.state', 'in', ('purchase', 'done')), ('date_planned', '>=', inicio)],
+            'product_qty', 'product_uom_id')
+
+        filas = []
+        cursor = inicio
+        for _i in range(meses):
+            clave = (cursor.year, cursor.month)
+            filas.append({
+                'mes': f'{self.MESES[cursor.month - 1]} {cursor.year}',
+                'comprado': compradas.get(clave, 0.0),
+                'vendido': vendidas.get(clave, 0.0),
+            })
+            cursor += relativedelta(months=1)
+        return filas
+
+    def _lineas_con_fecha(self, modelo, producto, company, domain_extra,
+                          campo_qty, campo_uom):
+        """Cantidades por (año, mes) en unidad base, para UN producto."""
+        campos = [campo_qty, campo_uom]
+        con_fecha_propia = modelo == 'purchase.order.line'
+        campos.append('date_planned' if con_fecha_propia else 'order_id')
+        lineas = self.env[modelo].search_read(
+            [('product_id', '=', producto.id),
+             ('company_id', '=', company.id)] + domain_extra, campos)
+        fechas_orden = {}
+        if not con_fecha_propia:
+            ordenes = {l['order_id'][0] for l in lineas if l['order_id']}
+            fechas_orden = {o['id']: o['date_order'] for o in self.env['sale.order'].search_read(
+                [('id', 'in', list(ordenes))], ['date_order'])}
+        uoms = self.env['uom.uom']
+        base = producto.uom_id
+        totales = {}
+        for linea in lineas:
+            fecha = linea['date_planned'] if con_fecha_propia \
+                else fechas_orden.get(linea['order_id'][0])
+            if not fecha:
+                continue
+            cantidad = linea[campo_qty]
+            uom = uoms.browse(linea[campo_uom][0]) if linea[campo_uom] else False
+            if uom and uom != base:
+                cantidad = uom._compute_quantity(cantidad, base, round=False)
+            clave = (fecha.year, fecha.month)
+            totales[clave] = totales.get(clave, 0.0) + cantidad
+        return totales
+
+    def _ultimas_compras(self, producto, company, limite=10):
+        """Últimas compras SIN filtrar suplidor (REQ-C06 — el caso Trululú:
+        un producto con 7 distribuidores, se ve a quién y a cuánto se compró)."""
+        lineas = self.env['purchase.order.line'].search_read(
+            [('product_id', '=', producto.id),
+             ('company_id', '=', company.id),
+             ('order_id.state', 'in', ('purchase', 'done'))],
+            ['date_planned', 'product_qty', 'product_uom_id', 'price_unit',
+             'partner_id', 'order_id'],
+            order='date_planned desc', limit=limite)
+        base = producto.uom_id
+        uoms = self.env['uom.uom']
+        filas = []
+        for linea in lineas:
+            uom = uoms.browse(linea['product_uom_id'][0]) if linea['product_uom_id'] else base
+            factor = uom._compute_quantity(1.0, base, round=False) or 1.0
+            filas.append({
+                'fecha': linea['date_planned'],
+                'cantidad': linea['product_qty'],
+                'unidad': uom.name,
+                'costo': linea['price_unit'],
+                'costo_base': linea['price_unit'] / factor if factor else linea['price_unit'],
+                'suplidor': linea['partner_id'][1] if linea['partner_id'] else '',
+                'orden': linea['order_id'][1] if linea['order_id'] else '',
+            })
+        return filas
+
+    def _oc_pendientes_producto(self, producto, company):
+        """Panel "Órdenes de Compra Pendientes" del producto (captura 14)."""
+        lineas = self.env['purchase.order.line'].search_read(
+            [('product_id', '=', producto.id),
+             ('company_id', '=', company.id),
+             ('order_id.state', 'in', ('purchase', 'done'))],
+            ['order_id', 'date_planned', 'partner_id', 'product_qty',
+             'qty_received', 'product_uom_id'],
+            order='date_planned desc', limit=20)
+        filas = []
+        for linea in lineas:
+            pendiente = max(linea['product_qty'] - linea['qty_received'], 0.0)
+            if not pendiente:
+                continue
+            filas.append({
+                'orden': linea['order_id'][1] if linea['order_id'] else '',
+                'fecha': linea['date_planned'],
+                'suplidor': linea['partner_id'][1] if linea['partner_id'] else '',
+                'ordenada': linea['product_qty'],
+                'pendiente': pendiente,
+                'unidad': linea['product_uom_id'][1] if linea['product_uom_id'] else '',
+            })
+        return filas
+
+    def _devoluciones(self, producto, company, de_ventas):
+        """Devoluciones acumuladas (movimientos de retorno hechos), en base."""
+        usage = 'customer' if de_ventas else 'supplier'
+        grupos = self.env['stock.move']._read_group(
+            [('product_id', '=', producto.id),
+             ('company_id', '=', company.id),
+             ('state', '=', 'done'),
+             ('origin_returned_move_id', '!=', False),
+             ('location_id.usage' if de_ventas else 'location_dest_id.usage', '=', usage)],
+            [], ['quantity:sum'])
+        return grupos[0][0] or 0.0 if grupos else 0.0
