@@ -29,6 +29,15 @@ class Sugerido(models.TransientModel):
     dias_abastecer = fields.Integer(string='Días a abastecer', default=30, required=True)
     line_ids = fields.One2many('surtidora.sugerido.line', 'wizard_id', string='Sugerido')
 
+    def _compute_display_name(self):
+        """Nombre legible en la migaja de pan (en vez de 'surtidora.sugerido,6')."""
+        for wizard in self:
+            if wizard.suplidor_id:
+                wizard.display_name = _('Sugerido %(suplidor)s — %(fecha)s', suplidor=wizard.suplidor_id.name,
+                                        fecha=fields.Date.to_string(wizard.fecha_hasta or fields.Date.context_today(self)))
+            else:
+                wizard.display_name = _('Sugerido de compras')
+
     @api.constrains('fecha_desde', 'fecha_hasta', 'dias_abastecer')
     def _check_parametros(self):
         for wizard in self:

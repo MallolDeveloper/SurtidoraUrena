@@ -25,6 +25,10 @@
                         <button name="action_calcular" type="object" string="Calcular sugerido" class="btn-primary"/>
                         <button name="action_ordenar_lo_sugerido" type="object" string="Ordenar lo sugerido" class="btn-secondary" invisible="not line_ids"/>
                         <button name="action_quitar_cantidades" type="object" string="Quitar cantidades" class="btn-secondary" invisible="not line_ids"/>
+                        <button name="action_oc_temporal" type="object" string="Guardar OC temporal" class="btn-secondary" invisible="not line_ids"
+                                help="Borrador marcado como temporal — la negociación con el vendedor sigue abierta"/>
+                        <button name="action_oc_firme" type="object" string="Generar OC firme" class="btn-primary" invisible="not line_ids"
+                                help="Crea y CONFIRMA la orden — compromiso con el suplidor"/>
                     </div>
                     <field name="line_ids" nolabel="1">
                         <list editable="bottom" create="0" delete="0" default_order="cant_sugerida desc">
@@ -49,13 +53,6 @@
                         </list>
                     </field>
                 </sheet>
-                <footer>
-                    <button name="action_oc_temporal" type="object" string="Guardar OC temporal" class="btn-secondary"
-                            help="Borrador marcado como temporal — la negociación con el vendedor sigue abierta"/>
-                    <button name="action_oc_firme" type="object" string="Generar OC firme" class="btn-primary"
-                            help="Crea y CONFIRMA la orden — compromiso con el suplidor"/>
-                    <button string="Salir" class="btn-secondary" special="cancel"/>
-                </footer>
             </form>
         </field>
     </record>
