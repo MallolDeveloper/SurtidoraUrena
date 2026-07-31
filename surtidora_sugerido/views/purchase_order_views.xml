@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_purchase_order_form_temporal" model="ir.ui.view">
+        <field name="name">purchase.order.form.temporal</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="surtidora_es_temporal" invisible="not surtidora_es_temporal"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_purchase_order_filter_temporal" model="ir.ui.view">
+        <field name="name">purchase.order.search.temporal</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.view_purchase_order_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <filter name="filtro_temporales" string="OC temporales"
+                        domain="[('surtidora_es_temporal', '=', True)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
