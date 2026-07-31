@@ -69,6 +69,8 @@ class AutorizarPrecioLinea(models.TransientModel):
     uom_id = fields.Many2one(related='line_id.product_uom_id', string='Unidad')
     cantidad = fields.Float(related='line_id.product_uom_qty', string='Cantidad')
     precio_lista = fields.Monetary(currency_field='currency_id', string='Precio de lista', readonly=True)
-    precio_propuesto = fields.Monetary(related='line_id.price_unit', string='Precio propuesto')
+    # price_unit es Float (no Monetary) en sale.order.line — el related debe coincidir
+    precio_propuesto = fields.Float(
+        related='line_id.price_unit', string='Precio propuesto', digits='Product Price')
     currency_id = fields.Many2one(related='line_id.currency_id')
     bajo_costo = fields.Boolean(string='¡Bajo costo!', readonly=True)
