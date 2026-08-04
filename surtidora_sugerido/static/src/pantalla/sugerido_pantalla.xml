@@ -5,17 +5,23 @@
     <div class="surti-sugerido d-flex flex-column h-100 overflow-hidden">
 
         <div class="surti-toolbar d-flex flex-wrap align-items-end gap-2 p-2 border-bottom bg-view">
-            <div>
+            <div class="surti-combo">
                 <label class="small fw-bold d-block">Suplidor</label>
-                <input type="text" class="o_input surti-buscar" placeholder="Buscar suplidor..."
-                       t-model="state.filtroSuplidor"/>
-                <select class="o_input surti-select" t-model.number="state.suplidorId"
-                        t-on-change="cambioSuplidor">
-                    <option value="0">— Elegir —</option>
+                <input type="text" class="o_input surti-buscar" placeholder="Escriba para buscar..."
+                       autocomplete="off"
+                       t-att-value="state.filtroSuplidor"
+                       t-on-input="escribirSuplidor"
+                       t-on-focus="abrirLista"
+                       t-on-keydown="tecladoSuplidor"
+                       t-on-blur="cerrarLista"/>
+                <div class="surti-combo-lista" t-if="state.listaAbierta">
                     <t t-foreach="suplidoresFiltrados" t-as="s" t-key="s.id">
-                        <option t-att-value="s.id" t-esc="s.display_name"/>
+                        <div t-att-class="'surti-combo-item' + (s_index === state.resaltado ? ' surti-combo-activo' : '')"
+                             t-on-mousedown.prevent="() => this.elegirSuplidor(s)"
+                             t-esc="s.display_name"/>
                     </t>
-                </select>
+                    <div class="surti-combo-item text-muted" t-if="!suplidoresFiltrados.length">Sin coincidencias</div>
+                </div>
             </div>
             <div>
                 <label class="small fw-bold d-block">Ventas desde</label>

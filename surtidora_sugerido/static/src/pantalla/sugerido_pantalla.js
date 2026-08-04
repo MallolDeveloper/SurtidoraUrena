@@ -23,6 +23,8 @@ export class SugeridoPantalla extends Component {
         this.state = useState({
             suplidores: [],
             filtroSuplidor: "",
+            listaAbierta: false,
+            resaltado: 0,
             suplidorId: 0,
             desde: haceUnAno.toISOString().slice(0, 10),
             hasta: hoy.toISOString().slice(0, 10),
@@ -121,8 +123,55 @@ export class SugeridoPantalla extends Component {
         this.state.detalle = this.cacheDetalle[pid];
     }
 
-    cambioSuplidor() {
-        // cambiar el suplidor invalida lo calculado (las filas eran de otro)
+    // ------------------------------------------------------------------
+    // Combobox de suplidor (typeahead: la lista se ve MIENTRAS se escribe)
+    // ------------------------------------------------------------------
+    escribirSuplidor(ev) {
+        this.state.filtroSuplidor = ev.target.value;
+        this.state.listaAbierta = true;
+        this.state.resaltado = 0;
+        // el texto ya no corresponde a un suplidor elegido
+        this.state.suplidorId = 0;
+    }
+
+    abrirLista() {
+        this.state.listaAbierta = true;
+        this.state.resaltado = 0;
+    }
+
+    cerrarLista() {
+        this.state.listaAbierta = false;
+    }
+
+    elegirSuplidor(suplidor) {
+        const esOtro = this.suplidorCalculado && suplidor.id !== this.suplidorCalculado;
+        this.state.suplidorId = suplidor.id;
+        this.state.filtroSuplidor = suplidor.display_name;
+        this.cerrarLista();
+        if (esOtro) {
+            this._invalidarCalculo();
+        }
+    }
+
+    tecladoSuplidor(ev) {
+        const lista = this.suplidoresFiltrados;
+        if (ev.key === "ArrowDown") {
+            ev.preventDefault();
+            this.state.listaAbierta = true;
+            this.state.resaltado = Math.min(this.state.resaltado + 1, lista.length - 1);
+        } else if (ev.key === "ArrowUp") {
+            ev.preventDefault();
+            this.state.resaltado = Math.max(this.state.resaltado - 1, 0);
+        } else if (ev.key === "Enter" && this.state.listaAbierta && lista.length) {
+            ev.preventDefault();
+            this.elegirSuplidor(lista[this.state.resaltado] || lista[0]);
+        } else if (ev.key === "Escape") {
+            this.cerrarLista();
+        }
+    }
+
+    _invalidarCalculo() {
+        // las filas en pantalla eran de otro suplidor: fuera
         this.state.filas = [];
         this.state.detalle = null;
         this.state.seleccionId = 0;

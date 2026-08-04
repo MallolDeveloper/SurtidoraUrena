@@ -1,6 +1,33 @@
 .surti-sugerido {
-    .surti-buscar { width: 160px; margin-right: 4px; }
-    .surti-select { width: 240px; }
+    .surti-combo { position: relative; }
+    .surti-buscar { width: 300px; }
+    .surti-combo-lista {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 20;
+        min-width: 300px;
+        max-width: 420px;
+        max-height: 340px;
+        overflow-y: auto;
+        background: var(--surti-combo-bg, #fff);
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    }
+    .surti-combo-item {
+        padding: 4px 10px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        &:hover { background: #f0ebf5; }
+    }
+    .surti-combo-activo {
+        background: #714b67;
+        color: #fff;
+        &:hover { background: #714b67; }
+    }
     .surti-dias { width: 90px; }
     .o_input {
         border: 1px solid #ccc;
