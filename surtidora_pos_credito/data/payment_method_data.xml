@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Sin diario contable el método es tipo "pay_later": el monto queda en
+         la cuenta por cobrar del cliente en vez de entrar a caja.
+         split_transactions = un apunte por cliente (no un consolidado). -->
+    <record id="metodo_pago_credito" model="pos.payment.method">
+        <field name="name">Crédito (Cuenta Cliente)</field>
+        <field name="split_transactions" eval="True"/>
+    </record>
+</odoo>
