@@ -1,6 +1,6 @@
 import { patch } from "@web/core/utils/patch";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
-import { OrderPaymentValidation } from "@point_of_sale/app/utils/order_payment_validation";
+import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_validation";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { _t } from "@web/core/l10n/translation";
 
