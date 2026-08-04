@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="surtidora_pos_panel.ProductScreen" t-inherit="point_of_sale.ProductScreen" t-inherit-mode="extension">
+    <xpath expr="//div[hasclass('rightpane')]" position="after">
+        <div class="surti-pos-panel d-flex flex-column border-start bg-view p-2 overflow-y-auto"
+             t-if="!ui.isSmall">
+            <t t-if="surtiPanel.datos">
+                <div class="fw-bolder mb-1 surti-pos-titulo" t-esc="surtiPanel.datos.producto"/>
+
+                <div class="surti-pos-seccion">Precios por unidad</div>
+                <table class="surti-pos-tabla">
+                    <tr t-foreach="surtiPanel.datos.precios" t-as="p" t-key="p_index">
+                        <td t-esc="p.unidad"/>
+                        <td class="text-end fw-bolder" t-esc="surtiN(p.precio)"/>
+                        <td class="text-end text-muted" t-esc="'(' + surtiN(p.equivalente) + ' c/u)'"/>
+                    </tr>
+                </table>
+
+                <div class="surti-pos-seccion">Existencia por almacén</div>
+                <table class="surti-pos-tabla">
+                    <tr t-foreach="surtiPanel.datos.almacenes" t-as="a" t-key="a_index">
+                        <td t-esc="a.almacen"/>
+                        <td class="text-end" t-att-class="a.disponible &lt;= 0 ? 'text-danger fw-bolder' : 'fw-bolder'"
+                            t-esc="surtiN(a.disponible)"/>
+                    </tr>
+                </table>
+
+                <div class="surti-pos-seccion">
+                    <t t-if="surtiPanel.datos.cliente">Últimas ventas a <t t-esc="surtiPanel.datos.cliente"/></t>
+                    <t t-else="">Últimas ventas al cliente</t>
+                </div>
+                <t t-if="surtiPanel.datos.cliente">
+                    <table class="surti-pos-tabla" t-if="surtiPanel.datos.historial.length">
+                        <tr t-foreach="surtiPanel.datos.historial" t-as="h" t-key="h_index">
+                            <td t-esc="h.fecha"/>
+                            <td class="text-end" t-esc="surtiN(h.cantidad, 0) + ' ' + h.unidad"/>
+                            <td class="text-end fw-bolder" t-esc="surtiN(h.precio)"/>
+                        </tr>
+                    </table>
+                    <div class="text-muted small" t-else="">
+                        Primera vez que se le vende este producto.
+                    </div>
+                </t>
+                <div class="text-muted small" t-else="">
+                    Seleccione un cliente para ver su historial.
+                </div>
+            </t>
+            <t t-else="">
+                <div class="text-muted small m-auto text-center">
+                    <t t-if="surtiPanel.cargando">Cargando...</t>
+                    <t t-else="">Toque un producto para ver precios, existencias y el historial del cliente.</t>
+                </div>
+            </t>
+        </div>
+    </xpath>
+</t>
+
+</templates>

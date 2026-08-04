@@ -81,23 +81,16 @@ class Sugerido(models.TransientModel):
     def _crear_oc(self, firme):
         self.ensure_one()
         a_ordenar = self.line_ids.filtered(lambda l: l.cantidad_ordenar > 0)
-        if not a_ordenar:
-            raise UserError(_('Ninguna línea tiene "Cantidad a ordenar".'))
-        orden = self.env['purchase.order'].with_company(self.company_id).create({
-            'partner_id': self.suplidor_id.id,
-            'company_id': self.company_id.id,
-            'surtidora_es_temporal': not firme,
-            'order_line': [(0, 0, {
+        orden = self.env['surtidora.sugerido.motor'].crear_oc(
+            self.suplidor_id, self.company_id,
+            [{
                 'product_id': linea.product_id.id,
-                'name': self._descripcion_oc(linea),
-                'product_qty': linea.cantidad_ordenar,
-                'product_uom_id': linea.uom_compra_id.id,
-                'price_unit': linea.costo_uom_compra,
-                'date_planned': fields.Datetime.now(),
-            }) for linea in a_ordenar],
-        })
-        if firme:
-            orden.button_confirm()
+                'uom_id': linea.uom_compra_id.id,
+                'cantidad': linea.cantidad_ordenar,
+                'precio': linea.costo_uom_compra,
+                'descripcion': self._descripcion_oc(linea),
+            } for linea in a_ordenar],
+            firme)
         return {
             'type': 'ir.actions.act_window',
             'name': _('Orden de compra %s', _('firme') if firme else _('temporal')),
