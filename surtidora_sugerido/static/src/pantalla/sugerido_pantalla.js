@@ -44,7 +44,7 @@ export class SugeridoPantalla extends Component {
                 "res.partner",
                 [["supplier_rank", ">", 0]],
                 ["display_name"],
-                { order: "display_name" }
+                { order: "name" }
             );
         });
     }
