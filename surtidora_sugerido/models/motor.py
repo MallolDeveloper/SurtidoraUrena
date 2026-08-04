@@ -194,6 +194,7 @@ class SugeridoMotor(models.AbstractModel):
         ultima = ultima[0] if ultima else {}
         hoy = fields.Date.context_today(self)
         dias_desde = (hoy - ultima['fecha'].date()).days if ultima.get('fecha') else 0
+        venta = self._ultima_venta(producto, company)
         return {
             'ultimo_costo_base': ultima.get('costo_base', 0.0),
             'costo_promedio': producto.standard_price,
@@ -201,7 +202,51 @@ class SugeridoMotor(models.AbstractModel):
             'existencia_actual': producto.qty_available,
             'dev_ventas': self._devoluciones(producto, company, de_ventas=True),
             'dev_compras': self._devoluciones(producto, company, de_ventas=False),
+            'ultima_venta_fecha': self._fecha_str(venta.get('fecha')),
+            'ultima_venta_precio': venta.get('precio', 0.0),
+            'ultima_venta_unidad': venta.get('unidad', ''),
+            'ultima_venta_cliente': venta.get('cliente', ''),
         }
+
+    def _ultima_venta(self, producto, company):
+        """Última venta del producto — a qué precio se le vendió al cliente
+        (captura 14: "Última Venta" / "Últ. Und. Venta"). El margen en vivo
+        mientras se negocia el costo con el suplidor. Mezcla POS y backend."""
+        candidatas = []
+        linea = self.env['sale.order.line'].search_read(
+            [('product_id', '=', producto.id),
+             ('company_id', '=', company.id),
+             ('state', '=', 'sale')],
+            ['price_unit', 'product_uom_id', 'order_id', 'order_partner_id'],
+            order='id desc', limit=1)
+        if linea:
+            orden = self.env['sale.order'].search_read(
+                [('id', '=', linea[0]['order_id'][0])], ['date_order'])
+            candidatas.append({
+                'fecha': orden[0]['date_order'] if orden else None,
+                'precio': linea[0]['price_unit'],
+                'unidad': linea[0]['product_uom_id'][1] if linea[0]['product_uom_id'] else '',
+                'cliente': linea[0]['order_partner_id'][1] if linea[0]['order_partner_id'] else '',
+            })
+        if 'pos.order.line' in self.env:
+            linea_pos = self.env['pos.order.line'].search_read(
+                [('product_id', '=', producto.id),
+                 ('order_id.company_id', '=', company.id),
+                 ('order_id.state', 'in', ('paid', 'done', 'invoiced'))],
+                ['price_unit', 'order_id'], order='id desc', limit=1)
+            if linea_pos:
+                orden_pos = self.env['pos.order'].search_read(
+                    [('id', '=', linea_pos[0]['order_id'][0])],
+                    ['date_order', 'partner_id'])
+                candidatas.append({
+                    'fecha': orden_pos[0]['date_order'] if orden_pos else None,
+                    'precio': linea_pos[0]['price_unit'],
+                    'unidad': producto.uom_id.name,
+                    'cliente': (orden_pos[0]['partner_id'][1]
+                                if orden_pos and orden_pos[0]['partner_id'] else 'Mostrador'),
+                })
+        candidatas = [c for c in candidatas if c['fecha']]
+        return max(candidatas, key=lambda c: c['fecha']) if candidatas else {}
 
     def matriz_mensual(self, producto, company, meses=12):
         """Matriz mensual comprado vs vendido, en unidad base (REQ-C05).

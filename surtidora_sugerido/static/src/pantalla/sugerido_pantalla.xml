@@ -61,6 +61,12 @@
                     <span>Dev. compras: <b t-esc="n(state.detalle.info.dev_compras)"/></span>
                     <span>Ventas × día: <b t-esc="n(seleccion.ventas_dia, 4)"/></span>
                     <span>Sugerida: <b t-esc="n(seleccion.cant_sugerida)"/></span>
+                    <span class="surti-venta" t-if="state.detalle.info.ultima_venta_fecha">
+                        Última venta: <b t-esc="n(state.detalle.info.ultima_venta_precio)"/>
+                        (<t t-esc="state.detalle.info.ultima_venta_unidad"/>,
+                        <t t-esc="fecha(state.detalle.info.ultima_venta_fecha)"/>,
+                        <t t-esc="state.detalle.info.ultima_venta_cliente"/>)
+                    </span>
                 </div>
                 <div class="small text-muted" t-if="state.cargandoDetalle">Cargando detalle...</div>
             </div>
