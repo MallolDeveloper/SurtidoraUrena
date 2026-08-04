@@ -64,8 +64,10 @@
         <field name="target">current</field>
     </record>
 
+    <!-- El menú apunta a la pantalla única OWL (pantalla_views.xml). El wizard
+         clásico queda como respaldo sin menú. -->
     <menuitem id="menu_sugerido" name="Sugerido (Surtidora)"
               parent="purchase.menu_purchase_root"
-              action="action_sugerido" sequence="16"
+              action="action_sugerido_pantalla" sequence="16"
               groups="purchase.group_purchase_user"/>
 </odoo>

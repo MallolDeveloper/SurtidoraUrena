@@ -1,0 +1,32 @@
+.surti-pos-panel {
+    width: 260px;
+    flex-shrink: 0;
+    font-size: 12px;
+
+    .surti-pos-titulo {
+        font-size: 13px;
+        line-height: 1.2;
+    }
+    .surti-pos-seccion {
+        margin-top: 10px;
+        margin-bottom: 3px;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 10.5px;
+        opacity: 0.65;
+    }
+    .surti-pos-tabla {
+        width: 100%;
+        td {
+            padding: 2px 3px;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+            white-space: nowrap;
+        }
+        td:first-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 110px;
+            white-space: nowrap;
+        }
+    }
+}

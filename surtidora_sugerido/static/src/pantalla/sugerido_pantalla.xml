@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="surtidora_sugerido.Pantalla">
+    <div class="surti-sugerido d-flex flex-column h-100 overflow-hidden">
+
+        <div class="surti-toolbar d-flex flex-wrap align-items-end gap-2 p-2 border-bottom bg-view">
+            <div>
+                <label class="small fw-bold d-block">Suplidor</label>
+                <input type="text" class="o_input surti-buscar" placeholder="Buscar suplidor..."
+                       t-model="state.filtroSuplidor"/>
+                <select class="o_input surti-select" t-model.number="state.suplidorId"
+                        t-on-change="cambioSuplidor">
+                    <option value="0">— Elegir —</option>
+                    <t t-foreach="suplidoresFiltrados" t-as="s" t-key="s.id">
+                        <option t-att-value="s.id" t-esc="s.display_name"/>
+                    </t>
+                </select>
+            </div>
+            <div>
+                <label class="small fw-bold d-block">Ventas desde</label>
+                <input type="date" class="o_input" t-model="state.desde"/>
+            </div>
+            <div>
+                <label class="small fw-bold d-block">Hasta</label>
+                <input type="date" class="o_input" t-model="state.hasta"/>
+            </div>
+            <div>
+                <label class="small fw-bold d-block">Días a abastecer</label>
+                <input type="number" class="o_input surti-dias" t-model.number="state.dias"/>
+            </div>
+            <button class="btn btn-primary" t-on-click="calcular" t-att-disabled="state.cargando">
+                <t t-if="state.cargando">Calculando...</t>
+                <t t-else="">Calcular sugerido</t>
+            </button>
+            <button class="btn btn-secondary" t-on-click="ordenarLoSugerido"
+                    t-att-disabled="!state.filas.length">Ordenar lo sugerido</button>
+            <button class="btn btn-secondary" t-on-click="quitarCantidades"
+                    t-att-disabled="!state.filas.length">Quitar cantidades</button>
+            <button class="btn btn-secondary" t-on-click="() => this.crearOC(false)"
+                    t-att-disabled="!state.filas.length or state.creandoOC">Guardar OC temporal</button>
+            <button class="btn btn-primary" t-on-click="() => this.crearOC(true)"
+                    t-att-disabled="!state.filas.length or state.creandoOC">
+                <t t-if="state.creandoOC">Creando orden...</t>
+                <t t-else="">Generar OC firme</t>
+            </button>
+            <span class="ms-auto small text-muted fst-italic">Los costos del producto NO incluyen ITBIS</span>
+        </div>
+
+        <div class="surti-info d-flex gap-2 p-2 border-bottom" t-if="seleccion">
+            <div class="flex-grow-1">
+                <div class="fw-bold text-primary mb-1">
+                    <t t-esc="seleccion.referencia"/> — <t t-esc="seleccion.producto"/>
+                </div>
+                <div class="d-flex flex-wrap gap-3 small" t-if="state.detalle">
+                    <span>Último costo (base): <b t-esc="n(state.detalle.info.ultimo_costo_base)"/></span>
+                    <span>Costo promedio: <b t-esc="n(state.detalle.info.costo_promedio)"/></span>
+                    <span>Días desde últ. compra: <b t-esc="state.detalle.info.dias_desde_compra"/></span>
+                    <span>Existencia (base): <b t-esc="n(state.detalle.info.existencia_actual)"/></span>
+                    <span>Dev. ventas: <b t-esc="n(state.detalle.info.dev_ventas)"/></span>
+                    <span>Dev. compras: <b t-esc="n(state.detalle.info.dev_compras)"/></span>
+                    <span>Ventas × día: <b t-esc="n(seleccion.ventas_dia, 4)"/></span>
+                    <span>Sugerida: <b t-esc="n(seleccion.cant_sugerida)"/></span>
+                </div>
+                <div class="small text-muted" t-if="state.cargandoDetalle">Cargando detalle...</div>
+            </div>
+            <div class="surti-matriz" t-if="state.detalle">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Mes</th><th class="text-end">Compras</th><th class="text-end">Ventas</th></tr></thead>
+                    <tbody>
+                        <t t-foreach="state.detalle.matriz" t-as="mes" t-key="mes.mes">
+                            <tr t-att-class="mes.vendido > mes.comprado ? 'table-warning' : ''">
+                                <td t-esc="mes.mes"/>
+                                <td class="text-end" t-esc="n(mes.comprado, 0)"/>
+                                <td class="text-end" t-esc="n(mes.vendido, 0)"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="surti-grid flex-grow-1 overflow-auto">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="surti-thead">
+                    <tr>
+                        <th t-on-click="() => this.ordenarPor('referencia')">Referencia</th>
+                        <th t-on-click="() => this.ordenarPor('producto')">Producto</th>
+                        <th>Unidad compra</th>
+                        <th>Ref. suplidor</th>
+                        <th t-on-click="() => this.ordenarPor('fecha_ultima_compra')">Últ. compra</th>
+                        <th class="text-end" t-on-click="() => this.ordenarPor('existencia_actual')">Existencia</th>
+                        <th class="text-end" t-on-click="() => this.ordenarPor('salidas_periodo')">Salidas</th>
+                        <th class="text-end" t-on-click="() => this.ordenarPor('ventas_dia')">Ventas × día</th>
+                        <th class="text-end">OC pend.</th>
+                        <th class="text-end" t-on-click="() => this.ordenarPor('cant_necesaria')">Necesaria</th>
+                        <th class="text-end" t-on-click="() => this.ordenarPor('cant_sugerida')">Sugerida</th>
+                        <th class="text-end">Cantidad a ordenar</th>
+                        <th class="text-end">Costo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-foreach="filasOrdenadas" t-as="fila" t-key="fila.product_id">
+                        <tr t-att-class="fila.product_id === state.seleccionId ? 'surti-sel' : ''"
+                            t-on-click="() => this.seleccionar(fila)">
+                            <td t-esc="fila.referencia"/>
+                            <td class="surti-prod" t-esc="fila.producto"/>
+                            <td t-esc="fila.uom_compra"/>
+                            <td t-esc="fila.ref_suplidor"/>
+                            <td t-esc="fecha(fila.fecha_ultima_compra)"/>
+                            <td class="text-end" t-esc="n(fila.existencia_actual)"/>
+                            <td class="text-end" t-esc="n(fila.salidas_periodo)"/>
+                            <td class="text-end" t-esc="n(fila.ventas_dia, 4)"/>
+                            <td class="text-end" t-esc="n(fila.ordenes_pendientes)"/>
+                            <td class="text-end" t-esc="n(fila.cant_necesaria)"/>
+                            <td class="text-end" t-att-class="fila.cant_sugerida > 0 ? 'text-success fw-bold' : 'text-muted'"
+                                t-esc="n(fila.cant_sugerida)"/>
+                            <td class="text-end">
+                                <input type="number" min="0" class="surti-qty text-end"
+                                       t-att-value="fila.cantidad_ordenar || ''"
+                                       t-on-click.stop=""
+                                       t-on-change="(ev) => this.actualizarCantidad(fila, ev)"/>
+                            </td>
+                            <td class="text-end" t-esc="n(fila.costo_uom_compra)"/>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+            <div class="p-4 text-center text-muted" t-if="!state.filas.length and !state.cargando">
+                Elija un suplidor y presione "Calcular sugerido".
+            </div>
+        </div>
+
+        <div class="surti-bottom d-flex gap-2 p-2 border-top" t-if="state.detalle">
+            <div class="w-50">
+                <div class="fw-bold small mb-1">Órdenes de compra pendientes</div>
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Orden</th><th>Fecha</th><th>Suplidor</th><th class="text-end">Ordenada</th><th class="text-end">Pendiente</th><th>Unidad</th></tr></thead>
+                    <tbody>
+                        <t t-foreach="state.detalle.oc_pendientes" t-as="oc" t-key="oc_index">
+                            <tr>
+                                <td t-esc="oc.orden"/><td t-esc="fecha(oc.fecha)"/><td t-esc="oc.suplidor"/>
+                                <td class="text-end" t-esc="n(oc.ordenada)"/>
+                                <td class="text-end" t-esc="n(oc.pendiente)"/>
+                                <td t-esc="oc.unidad"/>
+                            </tr>
+                        </t>
+                        <tr t-if="!state.detalle.oc_pendientes.length"><td colspan="6" class="text-muted">Sin órdenes pendientes</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="w-50">
+                <div class="fw-bold small mb-1">Últimas diez compras del producto (todos los suplidores)</div>
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Fecha</th><th class="text-end">Cantidad</th><th>Unidad</th><th class="text-end">Costo</th><th>Suplidor</th></tr></thead>
+                    <tbody>
+                        <t t-foreach="state.detalle.ultimas_compras" t-as="compra" t-key="compra_index">
+                            <tr>
+                                <td t-esc="fecha(compra.fecha)"/>
+                                <td class="text-end" t-esc="n(compra.cantidad)"/>
+                                <td t-esc="compra.unidad"/>
+                                <td class="text-end" t-esc="n(compra.costo)"/>
+                                <td t-esc="compra.suplidor"/>
+                            </tr>
+                        </t>
+                        <tr t-if="!state.detalle.ultimas_compras.length"><td colspan="5" class="text-muted">Sin compras registradas</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</t>
+
+</templates>

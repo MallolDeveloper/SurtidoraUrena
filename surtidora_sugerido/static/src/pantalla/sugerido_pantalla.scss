@@ -1,0 +1,38 @@
+.surti-sugerido {
+    .surti-buscar { width: 160px; margin-right: 4px; }
+    .surti-select { width: 240px; }
+    .surti-dias { width: 90px; }
+    .o_input {
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 3px 8px;
+    }
+    .surti-matriz {
+        max-height: 190px;
+        overflow-y: auto;
+        min-width: 240px;
+        font-size: 12px;
+    }
+    .surti-info { max-height: 210px; }
+    .surti-thead th {
+        position: sticky;
+        top: 0;
+        background: var(--surti-th-bg, #f1f1f1);
+        cursor: pointer;
+        white-space: nowrap;
+        z-index: 1;
+    }
+    .surti-prod {
+        max-width: 320px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .surti-sel { outline: 2px solid #714b67; outline-offset: -2px; }
+    .surti-qty { width: 90px; border: 1px solid #ccc; border-radius: 4px; padding: 1px 5px; }
+    .surti-bottom {
+        max-height: 220px;
+        overflow-y: auto;
+        font-size: 12px;
+    }
+}

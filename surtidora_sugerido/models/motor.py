@@ -10,9 +10,11 @@ Convención de unidades: TODO se presenta en la UNIDAD DE COMPRA del producto
 (REQ-C03), como en la pantalla de ADG. Los costos van SIN ITBIS (así los
 guarda la base y así los presenta el sugerido del cliente).
 """
+from datetime import timedelta
+
 from dateutil.relativedelta import relativedelta
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -36,6 +38,10 @@ class SugeridoMotor(models.AbstractModel):
              ('order_id.date_order', '>=', fecha_desde),
              ('order_id.date_order', '<=', fecha_hasta)],
             'product_uom_qty', 'product_uom_id')
+        for pid, qty in self._total_pos_por_producto(
+                productos, company, fecha_desde, fecha_hasta).items():
+            ventas[pid] = ventas.get(pid, 0.0) + qty
+        existencias = self._existencia_por_producto(productos, company)
         pendientes = self._oc_pendiente_por_producto(productos, company)
         ultimas = self._ultima_compra_por_producto(productos, suplidor, company)
         refs = self._referencias_suplidor(productos, suplidor)
@@ -48,7 +54,7 @@ class SugeridoMotor(models.AbstractModel):
 
             salidas_base = ventas.get(producto.id, 0.0)
             ventas_dia = salidas_base / dias_periodo / factor
-            existencia = producto.qty_available / factor
+            existencia = existencias.get(producto.id, 0.0) / factor
             pendiente = pendientes.get(producto.id, 0.0) / factor
             necesaria = ventas_dia * dias_abastecer
             ultima = ultimas.get(producto.id, {})
@@ -99,6 +105,30 @@ class SugeridoMotor(models.AbstractModel):
             totales[producto.id] = totales.get(producto.id, 0.0) + cantidad
         return totales
 
+    def _total_pos_por_producto(self, productos, company, desde, hasta):
+        """Ventas de mostrador: el POS no genera sale.order.line — sin esta
+        pasada el sugerido subestima la rotacion (qty ya viene en base)."""
+        if 'pos.order.line' not in self.env:
+            return {}
+        grupos = self.env['pos.order.line']._read_group(
+            [('product_id', 'in', productos.ids),
+             ('order_id.company_id', '=', company.id),
+             ('order_id.state', 'in', ('paid', 'done', 'invoiced')),
+             ('order_id.date_order', '>=', desde),
+             ('order_id.date_order', '<=', hasta)],
+            ['product_id'], ['qty:sum'])
+        return {p.id: q or 0.0 for p, q in grupos}
+
+    def _existencia_por_producto(self, productos, company):
+        """Existencia fisica POR COMPANIA (qty_available mezclaria el stock
+        de todas las companias activas del usuario)."""
+        grupos = self.env['stock.quant']._read_group(
+            [('product_id', 'in', productos.ids),
+             ('company_id', '=', company.id),
+             ('location_id.usage', '=', 'internal')],
+            ['product_id'], ['quantity:sum'])
+        return {p.id: q or 0.0 for p, q in grupos}
+
     def _oc_pendiente_por_producto(self, productos, company):
         """Cantidad ordenada y aún no recibida, en unidad base (REQ-C02)."""
         grupos = self.env['purchase.order.line']._read_group(
@@ -125,18 +155,22 @@ class SugeridoMotor(models.AbstractModel):
              ('order_id.state', 'in', ('purchase', 'done'))],
             ['product_id', 'product_uom_id', 'product_qty', 'date_planned'],
             order='date_planned desc')
+        base_por_producto = {p.id: p.uom_id for p in productos}
+        uom_ids = {l['product_uom_id'][0] for l in lineas if l['product_uom_id']}
+        uoms = {u.id: u for u in self.env['uom.uom'].browse(list(uom_ids))}
         ultimas = {}
-        uoms = self.env['uom.uom']
         for linea in lineas:
             pid = linea['product_id'][0]
             if pid in ultimas:
                 continue
-            producto = self.env['product.product'].browse(pid)
+            base = base_por_producto.get(pid)
             cantidad = linea['product_qty']
-            uom = uoms.browse(linea['product_uom_id'][0]) if linea['product_uom_id'] else False
-            if uom and uom != producto.uom_id:
-                cantidad = uom._compute_quantity(cantidad, producto.uom_id, round=False)
+            uom = uoms.get(linea['product_uom_id'][0]) if linea['product_uom_id'] else None
+            if uom and base and uom != base:
+                cantidad = uom._compute_quantity(cantidad, base, round=False)
             ultimas[pid] = {'fecha': linea['date_planned'], 'cantidad': cantidad}
+            if len(ultimas) == len(base_por_producto):
+                break
         return ultimas
 
     def _referencias_suplidor(self, productos, suplidor):
@@ -185,6 +219,8 @@ class SugeridoMotor(models.AbstractModel):
             'purchase.order.line', producto, company,
             [('order_id.state', 'in', ('purchase', 'done')), ('date_planned', '>=', inicio)],
             'product_qty', 'product_uom_id')
+        for clave, qty in self._pos_mensual(producto, company, inicio).items():
+            vendidas[clave] = vendidas.get(clave, 0.0) + qty
 
         filas = []
         cursor = inicio
@@ -197,6 +233,28 @@ class SugeridoMotor(models.AbstractModel):
             })
             cursor += relativedelta(months=1)
         return filas
+
+    def _pos_mensual(self, producto, company, inicio):
+        """Ventas de mostrador por (ano, mes) — complementa la matriz."""
+        if 'pos.order.line' not in self.env:
+            return {}
+        lineas = self.env['pos.order.line'].search_read(
+            [('product_id', '=', producto.id),
+             ('order_id.company_id', '=', company.id),
+             ('order_id.state', 'in', ('paid', 'done', 'invoiced'))],
+            ['qty', 'order_id'])
+        if not lineas:
+            return {}
+        fechas = {o['id']: o['date_order'] for o in self.env['pos.order'].search_read(
+            [('id', 'in', list({l['order_id'][0] for l in lineas}))], ['date_order'])}
+        totales = {}
+        for linea in lineas:
+            fecha = fechas.get(linea['order_id'][0])
+            if not fecha or fecha.date() < inicio:
+                continue
+            clave = (fecha.year, fecha.month)
+            totales[clave] = totales.get(clave, 0.0) + linea['qty']
+        return totales
 
     def _lineas_con_fecha(self, modelo, producto, company, domain_extra,
                           campo_qty, campo_uom):
@@ -263,7 +321,7 @@ class SugeridoMotor(models.AbstractModel):
              ('order_id.state', 'in', ('purchase', 'done'))],
             ['order_id', 'date_planned', 'partner_id', 'product_qty',
              'qty_received', 'product_uom_id'],
-            order='date_planned desc', limit=20)
+            order='date_planned desc')
         filas = []
         for linea in lineas:
             pendiente = max(linea['product_qty'] - linea['qty_received'], 0.0)
@@ -277,7 +335,92 @@ class SugeridoMotor(models.AbstractModel):
                 'pendiente': pendiente,
                 'unidad': linea['product_uom_id'][1] if linea['product_uom_id'] else '',
             })
+            if len(filas) >= 20:
+                break
         return filas
+
+    # ------------------------------------------------------------------
+    # Creación de la OC (compartida por el wizard y la pantalla única)
+    # ------------------------------------------------------------------
+    def crear_oc(self, suplidor, company, lineas, firme):
+        """REQ-C07: OC temporal (borrador marcado) o firme (confirmada).
+
+        lineas: [{'product_id', 'uom_id', 'cantidad', 'precio', 'descripcion'}]"""
+        if not lineas:
+            raise UserError(_('Ninguna línea tiene "Cantidad a ordenar".'))
+        orden = self.env['purchase.order'].with_company(company).create({
+            'partner_id': suplidor.id,
+            'company_id': company.id,
+            'surtidora_es_temporal': not firme,
+            'order_line': [(0, 0, {
+                'product_id': linea['product_id'],
+                'name': linea.get('descripcion') or '',
+                'product_qty': linea['cantidad'],
+                'product_uom_id': linea['uom_id'],
+                'price_unit': linea.get('precio', 0.0),
+                'date_planned': fields.Datetime.now(),
+            }) for linea in lineas],
+        })
+        if firme:
+            orden.button_confirm()
+        return orden
+
+    # ------------------------------------------------------------------
+    # Fachada JSON para la pantalla única OWL (iteración 3)
+    # ------------------------------------------------------------------
+    @api.model
+    def sugerido_json(self, suplidor_id, fecha_desde, fecha_hasta, dias_abastecer):
+        """Filas del sugerido en tipos JSON, listas para la pantalla."""
+        suplidor = self.env['res.partner'].browse(int(suplidor_id))
+        company = self.env.company
+        desde = fields.Datetime.to_datetime(fecha_desde)
+        hasta = fields.Datetime.to_datetime(fecha_hasta) + timedelta(days=1)
+        filas = self.calcular(suplidor, company, desde, hasta, int(dias_abastecer))
+        productos = self.env['product.product'].browse([f['product_id'] for f in filas])
+        datos_producto = {p.id: (p.default_code or '', p.display_name) for p in productos}
+        uom_ids = list({f['uom_compra_id'] for f in filas})
+        nombres_uom = {u.id: u.name for u in self.env['uom.uom'].browse(uom_ids)}
+        for fila in filas:
+            referencia, nombre = datos_producto[fila['product_id']]
+            fila.update(
+                referencia=referencia,
+                producto=nombre,
+                uom_compra=nombres_uom.get(fila['uom_compra_id'], ''),
+                fecha_ultima_compra=self._fecha_str(fila['fecha_ultima_compra']),
+                cantidad_ordenar=0.0,
+            )
+        return filas
+
+    @api.model
+    def detalle_json(self, product_id, dias_abastecer=30):
+        """Paneles del producto seleccionado, en tipos JSON."""
+        producto = self.env['product.product'].browse(int(product_id))
+        company = self.env.company
+        compras = self._ultimas_compras(producto, company)
+        for compra in compras:
+            compra['fecha'] = self._fecha_str(compra['fecha'])
+            compra.pop('costo_base', None)
+        pendientes = self._oc_pendientes_producto(producto, company)
+        for oc in pendientes:
+            oc['fecha'] = self._fecha_str(oc['fecha'])
+        return {
+            'info': self.detalle_producto(producto, company, dias_abastecer),
+            'matriz': self.matriz_mensual(producto, company),
+            'ultimas_compras': compras,
+            'oc_pendientes': pendientes,
+        }
+
+    @api.model
+    def crear_oc_json(self, suplidor_id, lineas, firme):
+        """Crea la OC desde la pantalla. lineas: [{product_id, uom_id, cantidad, precio, descripcion}]"""
+        orden = self.crear_oc(
+            self.env['res.partner'].browse(int(suplidor_id)),
+            self.env.company, lineas, firme)
+        return {'order_id': orden.id, 'name': orden.name}
+
+    @staticmethod
+    def _fecha_str(fecha):
+        return fields.Datetime.to_string(fecha) if fecha else ''
 
     def _devoluciones(self, producto, company, de_ventas):
         """Devoluciones acumuladas (movimientos de retorno hechos), en base."""
