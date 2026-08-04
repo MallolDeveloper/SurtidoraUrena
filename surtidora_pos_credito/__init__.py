@@ -12,6 +12,10 @@ def configurar_credito_pos(env):
     """
     metodo = env.ref('surtidora_pos_credito.metodo_pago_credito')
     for config in env['pos.config'].search([]):
+        # Odoo prohíbe tocar los métodos de una caja con sesión abierta —
+        # esas se saltan (agregar el método a mano tras cerrar la sesión).
+        if config.has_active_session:
+            continue
         if metodo not in config.payment_method_ids:
             config.payment_method_ids = [(4, metodo.id)]
     env['res.company'].search([]).filtered(
