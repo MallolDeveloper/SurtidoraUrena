@@ -1,0 +1,53 @@
+// Vista de lista del catálogo (Surtidora Ureña).
+// Nada de esto se aplica si el usuario deja el mosaico: todo cuelga de
+// .surti-lista, que solo aparece cuando la vista de lista está activa.
+.surti-lista {
+    .product-list {
+        // una fila por producto, a lo ancho: gana más específico que el
+        // grid-template-columns del POS sin necesidad de !important
+        grid-template-columns: 1fr;
+    }
+
+    .surti-fila {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        min-height: 0;
+        padding: 5px 10px !important;
+
+        // El catálogo casi no tiene fotos: el recuadro gris solo estorba.
+        .product-img { display: none; }
+
+        .product-content {
+            flex: 1 1 auto;
+            min-width: 0;
+            margin: 0 !important;
+            padding: 0 !important;
+            align-items: center;
+        }
+
+        // En mosaico el nombre se centra y se recorta; en lista se lee entero.
+        .product-name {
+            white-space: normal;
+            text-align: left !important;
+            justify-content: flex-start !important;
+            display: block !important;
+        }
+
+        .surti-ref {
+            flex: 0 0 90px;
+            font-size: 11px;
+            font-family: monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .surti-precio {
+            flex: 0 0 auto;
+            margin-left: auto;
+            padding-left: 10px;
+            white-space: nowrap;
+        }
+    }
+}

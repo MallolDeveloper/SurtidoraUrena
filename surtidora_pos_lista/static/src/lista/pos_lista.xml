@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<!-- La clase en la raíz manda: de ella cuelga todo el estilo de lista. -->
+<t t-name="surtidora_pos_lista.ProductScreen" t-inherit="point_of_sale.ProductScreen" t-inherit-mode="extension">
+    <xpath expr="//div[hasclass('product-screen')]" position="attributes">
+        <attribute name="t-att-class">pos.surtiVistaLista ? 'surti-lista' : ''</attribute>
+    </xpath>
+    <xpath expr="//CategorySelector" position="after">
+        <div class="surti-vista-barra d-flex justify-content-end px-2 pb-1" t-if="!ui.isSmall">
+            <button class="btn btn-sm btn-light border" t-on-click="() => this.pos.surtiAlternarVista()"
+                    t-att-title="pos.surtiVistaLista ? 'Ver en mosaico' : 'Ver en lista'">
+                <i t-attf-class="fa {{ pos.surtiVistaLista ? 'fa-th-large' : 'fa-list' }} me-1"/>
+                <t t-if="pos.surtiVistaLista">Mosaico</t>
+                <t t-else="">Lista</t>
+            </button>
+        </div>
+    </xpath>
+</t>
+
+<!-- En lista la tarjeta muestra referencia y precio; en mosaico no cambia. -->
+<t t-name="surtidora_pos_lista.ProductCard" t-inherit="point_of_sale.ProductCard" t-inherit-mode="extension">
+    <xpath expr="//div[hasclass('product-content')]" position="before">
+        <span class="surti-ref text-muted" t-if="pos.surtiVistaLista and surtiReferencia" t-esc="surtiReferencia"/>
+    </xpath>
+    <xpath expr="//div[hasclass('product-content')]" position="after">
+        <span class="surti-precio fw-bolder" t-if="pos.surtiVistaLista" t-esc="surtiPrecio"/>
+    </xpath>
+</t>
+
+</templates>

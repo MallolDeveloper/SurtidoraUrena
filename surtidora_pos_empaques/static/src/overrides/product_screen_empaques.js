@@ -30,17 +30,22 @@ patch(ProductScreen.prototype, {
         );
     },
 
-    /** Opciones del popup. Cada item = { qty, price? } (price = manual, tarifa caja). */
+    /** Opciones del popup. Cada item = { qty, price? } (price = manual, tarifa caja).
+     *
+     * Cada empaque lleva su ARGUMENTO DE VENTA en la segunda línea: a cuánto
+     * sale la unidad suelta comprando ese empaque y cuánto se ahorra. Es la
+     * conversación real del mostrador ("el paquete está en 45, pero en caja
+     * de 24 te sale a 41"), así que va donde se elige la unidad. */
     _opcionesEmpaque(productTemplate) {
         const order = this.pos.getOrder();
         const pricelist = order && order.pricelist_id;
         const fmt = (valor) => this.env.utils.formatCurrency(valor);
+        const nombreBase = productTemplate.uom_id?.name || _t("Unidad");
+        const precioBase = productTemplate.getPrice(pricelist, 1, 0);
         const opciones = [
             {
                 id: 0,
-                label: `${productTemplate.uom_id?.name || _t("Unidad")} — ${fmt(
-                    productTemplate.getPrice(pricelist, 1, 0)
-                )}`,
+                label: `${nombreBase} — ${fmt(precioBase)}`,
                 item: { qty: 1 },
                 isSelected: true,
             },
@@ -51,7 +56,8 @@ patch(ProductScreen.prototype, {
             const tarifaCaja = productTemplate.getPrice(pricelist, factor, 0);
             opciones.push({
                 id: ++id,
-                label: `${uom.name} — ${fmt(tarifaCaja * factor)}`,
+                label: `${uom.name} (${factor} ${nombreBase}) — ${fmt(tarifaCaja * factor)}`,
+                description: this._argumentoEmpaque(precioBase, tarifaCaja, nombreBase),
                 item: { qty: factor },
             });
             if (productTemplate.surtidora_caja_fraccionable) {
@@ -71,6 +77,18 @@ patch(ProductScreen.prototype, {
             }
         }
         return opciones;
+    },
+
+    /** "41.00 por Paquete · ahorra 4.00 en cada uno" — el gancho de la venta.
+     * Si el empaque no trae descuento, solo se informa el equivalente. */
+    _argumentoEmpaque(precioBase, tarifaCaja, nombreBase) {
+        const fmt = (valor) => this.env.utils.formatCurrency(valor);
+        const equivalente = `${fmt(tarifaCaja)} ${_t("por")} ${nombreBase}`;
+        const ahorro = precioBase - tarifaCaja;
+        if (ahorro <= 0) {
+            return equivalente;
+        }
+        return `${equivalente} · ${_t("ahorra")} ${fmt(ahorro)} ${_t("en cada uno")}`;
     },
 
     async _elegirEmpaque(productTemplate) {
