@@ -18,7 +18,7 @@ al cliente preferencial. Réplica en Odoo:
 Sin reglas de nomenclatura frágiles: funciona con cédula, tarjeta o cualquier
 código que se registre al cliente.
     """,
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
