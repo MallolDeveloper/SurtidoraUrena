@@ -1,4 +1,17 @@
 .surti-sugerido {
+    // La pantalla ocupa el alto disponible sin importar si el contenedor de
+    // la acción es bloque o flex.
+    height: 100%;
+    flex: 1 1 auto;
+
+    // Sin min-height:0 un hijo flex NO se encoge por debajo de su contenido:
+    // con 134 filas la tabla empujaba los paneles de abajo fuera de la
+    // pantalla (y overflow-hidden del padre los recortaba). Este es el arreglo.
+    .surti-grid { min-height: 0; }
+    .surti-toolbar,
+    .surti-info,
+    .surti-bottom { flex-shrink: 0; }
+
     .surti-combo { position: relative; }
     .surti-buscar { width: 300px; }
     .surti-combo-lista {
@@ -58,6 +71,9 @@
     }
     .surti-sel { outline: 2px solid #714b67; outline-offset: -2px; }
     .surti-qty { width: 90px; border: 1px solid #ccc; border-radius: 4px; padding: 1px 5px; }
+    .surti-costo { width: 95px; border: 1px solid #ccc; border-radius: 4px; padding: 1px 5px; }
+    .surti-buscar-prod { width: 230px; }
+    .surti-ficha { color: #714b67; }
     .surti-bottom {
         max-height: 220px;
         overflow-y: auto;

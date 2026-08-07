@@ -35,6 +35,11 @@
                 <label class="small fw-bold d-block">Días a abastecer</label>
                 <input type="number" class="o_input surti-dias" t-model.number="state.dias"/>
             </div>
+            <div>
+                <label class="small fw-bold d-block">Buscar producto</label>
+                <input type="text" class="o_input surti-buscar-prod" placeholder="Código, nombre o ref. suplidor"
+                       t-model="state.buscarProducto"/>
+            </div>
             <button class="btn btn-primary" t-on-click="calcular" t-att-disabled="state.cargando">
                 <t t-if="state.cargando">Calculando...</t>
                 <t t-else="">Calcular sugerido</t>
@@ -109,10 +114,11 @@
                         <th class="text-end" t-on-click="() => this.ordenarPor('cant_sugerida')">Sugerida</th>
                         <th class="text-end">Cantidad a ordenar</th>
                         <th class="text-end">Costo</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <t t-foreach="filasOrdenadas" t-as="fila" t-key="fila.product_id">
+                    <t t-foreach="filasVisibles" t-as="fila" t-key="fila.product_id">
                         <tr t-att-class="fila.product_id === state.seleccionId ? 'surti-sel' : ''"
                             t-on-click="() => this.seleccionar(fila)">
                             <td t-esc="fila.referencia"/>
@@ -133,13 +139,29 @@
                                        t-on-click.stop=""
                                        t-on-change="(ev) => this.actualizarCantidad(fila, ev)"/>
                             </td>
-                            <td class="text-end" t-esc="n(fila.costo_uom_compra)"/>
+                            <td class="text-end">
+                                <input type="number" min="0" step="0.01" class="surti-costo text-end"
+                                       t-att-value="fila.costo_uom_compra"
+                                       t-on-click.stop=""
+                                       t-on-change="(ev) => this.actualizarCosto(fila, ev)"
+                                       title="Costo para esta orden. Para cambiarlo en el producto use el botón de al lado."/>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-link p-0 surti-ficha"
+                                        t-on-click.stop="() => this.abrirProducto(fila)"
+                                        title="Abrir la ficha del producto (cambiar el costo de forma permanente)">
+                                    <i class="fa fa-external-link"/>
+                                </button>
+                            </td>
                         </tr>
                     </t>
                 </tbody>
             </table>
             <div class="p-4 text-center text-muted" t-if="!state.filas.length and !state.cargando">
                 Elija un suplidor y presione "Calcular sugerido".
+            </div>
+            <div class="p-4 text-center text-muted" t-elif="!filasVisibles.length">
+                Ningún producto de este suplidor coincide con "<t t-esc="state.buscarProducto"/>".
             </div>
         </div>
 
