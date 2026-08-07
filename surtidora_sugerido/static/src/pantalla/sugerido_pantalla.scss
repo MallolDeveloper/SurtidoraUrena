@@ -57,10 +57,17 @@
 
     // Los datos del producto en cuadritos: etiqueta chica arriba, número
     // grande abajo. Se lee de un vistazo y se acomoda solo al ancho.
+    // Cuadro fijo de 4 columnas: los 8 datos caen en 2 filas parejas
+    // (en vez de estirarse en una sola línea larga en monitores anchos).
     .surti-datos {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+        grid-template-columns: repeat(4, 1fr);
         gap: 5px;
+
+        // En pantallas angostas 4 columnas aprietan demasiado el número.
+        @media (max-width: 1200px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
     }
     .surti-dato {
         display: flex;
