@@ -18,8 +18,10 @@ const CLAVE = "surtidora_pos_vista_lista";
 patch(PosStore.prototype, {
     async setup() {
         await super.setup(...arguments);
+        // La lista es la vista POR DEFECTO (el catálogo casi no tiene fotos);
+        // el mosaico queda como preferencia explícita de cada estación.
         // Se inicializa aquí para que OWL la siga desde el primer render.
-        this.surtiVistaLista = localStorage.getItem(CLAVE) === "1";
+        this.surtiVistaLista = localStorage.getItem(CLAVE) !== "0";
     },
 
     /** Clase que recibe cada tarjeta: la nuestra en lista, la de Odoo si no. */
