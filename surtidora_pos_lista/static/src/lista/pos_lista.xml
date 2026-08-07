@@ -20,11 +20,17 @@
 
 <!-- En lista la tarjeta muestra referencia y precio; en mosaico no cambia. -->
 <t t-name="surtidora_pos_lista.ProductCard" t-inherit="point_of_sale.ProductCard" t-inherit-mode="extension">
+    <!-- Solo en el catálogo: dentro del popup de combos el precio base
+         confundiría (ahí el componente no se cobra por separado). -->
     <xpath expr="//div[hasclass('product-content')]" position="before">
-        <span class="surti-ref text-muted" t-if="pos.surtiVistaLista and surtiReferencia" t-esc="surtiReferencia"/>
+        <span class="surti-ref text-muted"
+              t-if="pos.surtiVistaLista and !props.isComboPopup and surtiReferencia"
+              t-esc="surtiReferencia"/>
     </xpath>
     <xpath expr="//div[hasclass('product-content')]" position="after">
-        <span class="surti-precio fw-bolder" t-if="pos.surtiVistaLista" t-esc="surtiPrecio"/>
+        <span class="surti-precio fw-bolder"
+              t-if="pos.surtiVistaLista and !props.isComboPopup"
+              t-esc="surtiPrecio"/>
     </xpath>
 </t>
 
