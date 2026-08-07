@@ -29,6 +29,7 @@ export class SugeridoPantalla extends Component {
             desde: haceUnAno.toISOString().slice(0, 10),
             hasta: hoy.toISOString().slice(0, 10),
             dias: 30,
+            buscarProducto: "",
             filas: [],
             cargando: false,
             creandoOC: false,
@@ -70,6 +71,26 @@ export class SugeridoPantalla extends Component {
             if (va === vb) return 0;
             return (va > vb ? 1 : -1) * dir;
         });
+    }
+
+    /**
+     * Filas que se ven en la tabla: el buscador filtra por referencia,
+     * nombre o referencia del suplidor.
+     *
+     * Los botones de la botonera trabajan sobre ESTAS filas, no sobre todo
+     * el cálculo: si el comprador filtró "galleta", "Ordenar lo sugerido"
+     * ordena galletas y la OC lleva galletas — lo que ve es lo que hace.
+     */
+    get filasVisibles() {
+        const texto = this.state.buscarProducto.trim().toLowerCase();
+        if (!texto) {
+            return this.filasOrdenadas;
+        }
+        return this.filasOrdenadas.filter((f) =>
+            `${f.referencia || ""} ${f.producto || ""} ${f.ref_suplidor || ""}`
+                .toLowerCase()
+                .includes(texto)
+        );
     }
 
     get seleccion() {
@@ -182,15 +203,40 @@ export class SugeridoPantalla extends Component {
     // Acciones de la botonera (las de ADG)
     // ------------------------------------------------------------------
     ordenarLoSugerido() {
-        for (const fila of this.state.filas) {
+        for (const fila of this.filasVisibles) {
             fila.cantidad_ordenar = Math.max(0, Math.ceil(fila.cant_sugerida));
         }
     }
 
     quitarCantidades() {
-        for (const fila of this.state.filas) {
+        for (const fila of this.filasVisibles) {
             fila.cantidad_ordenar = 0;
         }
+    }
+
+    /**
+     * Abre la ficha del producto en un diálogo para corregir el costo (u
+     * otra cosa) sin salir del sugerido, y al cerrar refresca el costo de
+     * esa fila. No recalcula todo: eso borraría lo ya tecleado.
+     */
+    abrirProducto(fila) {
+        this.action.doAction(
+            {
+                type: "ir.actions.act_window",
+                res_model: "product.product",
+                res_id: fila.product_id,
+                views: [[false, "form"]],
+                target: "new",
+            },
+            { onClose: () => this._refrescarCosto(fila) }
+        );
+    }
+
+    async _refrescarCosto(fila) {
+        const datos = await this.orm.call("surtidora.sugerido.motor", "costo_json", [
+            fila.product_id,
+        ]);
+        fila.costo_uom_compra = datos.costo_uom_compra;
     }
 
     async crearOC(firme) {
@@ -201,7 +247,7 @@ export class SugeridoPantalla extends Component {
             this.notification.add("Calcule el sugerido antes de generar la orden.", { type: "warning" });
             return;
         }
-        const lineas = this.state.filas
+        const lineas = this.filasVisibles
             .filter((f) => f.cantidad_ordenar > 0)
             .map((f) => ({
                 product_id: f.product_id,
@@ -266,6 +312,13 @@ export class SugeridoPantalla extends Component {
     actualizarCantidad(fila, ev) {
         const valor = parseFloat(ev.target.value);
         fila.cantidad_ordenar = isNaN(valor) || valor < 0 ? 0 : valor;
+    }
+
+    /** Costo negociado para ESTA orden. No toca el costo del producto: para
+     * cambiarlo de forma permanente está el botón de la ficha. */
+    actualizarCosto(fila, ev) {
+        const valor = parseFloat(ev.target.value);
+        fila.costo_uom_compra = isNaN(valor) || valor < 0 ? 0 : valor;
     }
 }
 

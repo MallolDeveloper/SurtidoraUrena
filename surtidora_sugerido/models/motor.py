@@ -48,9 +48,7 @@ class SugeridoMotor(models.AbstractModel):
 
         filas = []
         for producto in productos.with_company(company):
-            base = producto.uom_id
-            uom_compra = producto.surtidora_uom_compra_id or base
-            factor = uom_compra._compute_quantity(1.0, base, round=False) or 1.0
+            uom_compra, factor = self._unidad_de_compra(producto)
 
             salidas_base = ventas.get(producto.id, 0.0)
             ventas_dia = salidas_base / dias_periodo / factor
@@ -74,6 +72,14 @@ class SugeridoMotor(models.AbstractModel):
                 'costo_uom_compra': producto.standard_price * factor,
             })
         return filas
+
+    def _unidad_de_compra(self, producto):
+        """Unidad en la que se compra el producto y cuántas unidades base
+        tiene (REQ-C03). Es la conversión que usa TODA la pantalla."""
+        base = producto.uom_id
+        uom_compra = producto.surtidora_uom_compra_id or base
+        factor = uom_compra._compute_quantity(1.0, base, round=False) or 1.0
+        return uom_compra, factor
 
     # ------------------------------------------------------------------
     # Agregados por lote
@@ -453,6 +459,21 @@ class SugeridoMotor(models.AbstractModel):
             'matriz': self.matriz_mensual(producto, company),
             'ultimas_compras': compras,
             'oc_pendientes': pendientes,
+        }
+
+    @api.model
+    def costo_json(self, product_id):
+        """Costo actual en la unidad de compra, sin ITBIS.
+
+        Sirve para refrescar UNA fila después de que el comprador edita el
+        producto, sin recalcular todo el sugerido (que borraría las
+        cantidades ya tecleadas)."""
+        producto = self.env['product.product'].browse(int(product_id))
+        producto = producto.with_company(self.env.company)
+        _uom, factor = self._unidad_de_compra(producto)
+        return {
+            'product_id': producto.id,
+            'costo_uom_compra': producto.standard_price * factor,
         }
 
     @api.model
