@@ -65,22 +65,49 @@
                 <div class="fw-bold text-primary mb-1">
                     <t t-esc="seleccion.referencia"/> — <t t-esc="seleccion.producto"/>
                 </div>
-                <div class="d-flex flex-wrap gap-3 small" t-if="state.detalle">
-                    <span>Último costo (base): <b t-esc="n(state.detalle.info.ultimo_costo_base)"/></span>
-                    <span>Costo promedio: <b t-esc="n(state.detalle.info.costo_promedio)"/></span>
-                    <span>Días desde últ. compra: <b t-esc="state.detalle.info.dias_desde_compra"/></span>
-                    <span>Existencia (base): <b t-esc="n(state.detalle.info.existencia_actual)"/></span>
-                    <span>Dev. ventas: <b t-esc="n(state.detalle.info.dev_ventas)"/></span>
-                    <span>Dev. compras: <b t-esc="n(state.detalle.info.dev_compras)"/></span>
-                    <span>Ventas × día: <b t-esc="n(seleccion.ventas_dia, 4)"/></span>
-                    <span>Sugerida: <b t-esc="n(seleccion.cant_sugerida)"/></span>
-                    <span class="surti-venta" t-if="state.detalle.info.ultima_venta_fecha">
-                        Última venta: <b t-esc="n(state.detalle.info.ultima_venta_precio)"/>
-                        (<t t-esc="state.detalle.info.ultima_venta_unidad"/>,
-                        <t t-esc="fecha(state.detalle.info.ultima_venta_fecha)"/>,
-                        <t t-esc="state.detalle.info.ultima_venta_cliente"/>)
-                    </span>
-                </div>
+                <t t-if="state.detalle">
+                    <div class="surti-datos">
+                        <div class="surti-dato">
+                            <span class="et">Último costo</span>
+                            <span class="vl" t-esc="n(state.detalle.info.ultimo_costo_base)"/>
+                        </div>
+                        <div class="surti-dato">
+                            <span class="et">Costo promedio</span>
+                            <span class="vl" t-esc="n(state.detalle.info.costo_promedio)"/>
+                        </div>
+                        <div class="surti-dato">
+                            <span class="et">Días desde compra</span>
+                            <span class="vl" t-esc="state.detalle.info.dias_desde_compra"/>
+                        </div>
+                        <div class="surti-dato">
+                            <span class="et">Existencia (base)</span>
+                            <span class="vl" t-esc="n(state.detalle.info.existencia_actual)"/>
+                        </div>
+                        <div class="surti-dato">
+                            <span class="et">Ventas × día</span>
+                            <span class="vl" t-esc="n(seleccion.ventas_dia, 4)"/>
+                        </div>
+                        <div class="surti-dato surti-dato-clave">
+                            <span class="et">Sugerida</span>
+                            <span class="vl" t-esc="n(seleccion.cant_sugerida)"/>
+                        </div>
+                        <div class="surti-dato">
+                            <span class="et">Dev. ventas</span>
+                            <span class="vl" t-esc="n(state.detalle.info.dev_ventas)"/>
+                        </div>
+                        <div class="surti-dato">
+                            <span class="et">Dev. compras</span>
+                            <span class="vl" t-esc="n(state.detalle.info.dev_compras)"/>
+                        </div>
+                    </div>
+                    <div class="surti-venta" t-if="state.detalle.info.ultima_venta_fecha">
+                        <span class="et">Última venta</span>
+                        <b t-esc="n(state.detalle.info.ultima_venta_precio)"/>
+                        <span t-esc="'· ' + state.detalle.info.ultima_venta_unidad"/>
+                        <span t-esc="'· ' + fecha(state.detalle.info.ultima_venta_fecha)"/>
+                        <span t-esc="'· ' + state.detalle.info.ultima_venta_cliente"/>
+                    </div>
+                </t>
                 <div class="small text-muted" t-if="state.cargandoDetalle">Cargando detalle...</div>
             </div>
             <div class="surti-matriz" t-if="state.detalle">

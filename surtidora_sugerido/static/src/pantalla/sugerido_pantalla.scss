@@ -53,8 +53,58 @@
         min-width: 240px;
         font-size: 12px;
     }
-    .surti-info { max-height: 210px; }
-    .surti-venta { color: #0d6e56; }
+    .surti-info { max-height: 210px; overflow-y: auto; }
+
+    // Los datos del producto en cuadritos: etiqueta chica arriba, número
+    // grande abajo. Se lee de un vistazo y se acomoda solo al ancho.
+    .surti-datos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+        gap: 5px;
+    }
+    .surti-dato {
+        display: flex;
+        flex-direction: column;
+        background: #f7f7f8;
+        border: 1px solid #e6e8ea;
+        border-radius: 5px;
+        padding: 3px 8px;
+        line-height: 1.25;
+
+        .et {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            color: #6c757d;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .vl { font-size: 15px; font-weight: 700; }
+    }
+    // La sugerida es la cifra por la que se abre esta pantalla: se destaca.
+    .surti-dato-clave {
+        background: #f3eef2;
+        border-color: #d9c9d4;
+        .vl { color: #714b67; }
+    }
+
+    .surti-venta {
+        margin-top: 5px;
+        font-size: 12px;
+        color: #0d6e56;
+        background: #e7f4f0;
+        border-radius: 5px;
+        padding: 3px 8px;
+
+        .et {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            margin-right: 5px;
+        }
+        span { margin-left: 4px; }
+    }
     .surti-thead th {
         position: sticky;
         top: 0;
