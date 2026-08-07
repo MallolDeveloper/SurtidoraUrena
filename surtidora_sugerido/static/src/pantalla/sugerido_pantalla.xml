@@ -49,11 +49,13 @@
             <button class="btn btn-secondary" t-on-click="quitarCantidades"
                     t-att-disabled="!state.filas.length">Quitar cantidades</button>
             <button class="btn btn-secondary" t-on-click="() => this.crearOC(false)"
-                    t-att-disabled="!state.filas.length or state.creandoOC">Guardar OC temporal</button>
+                    t-att-disabled="!state.filas.length or state.creandoOC"
+                    title="Borrador marcado como temporal — la negociación con el vendedor sigue abierta">Guardar temporal</button>
             <button class="btn btn-primary" t-on-click="() => this.crearOC(true)"
-                    t-att-disabled="!state.filas.length or state.creandoOC">
+                    t-att-disabled="!state.filas.length or state.creandoOC"
+                    title="Crea y CONFIRMA la orden de compra — compromiso con el suplidor">
                 <t t-if="state.creandoOC">Creando orden...</t>
-                <t t-else="">Generar OC firme</t>
+                <t t-else="">Generar</t>
             </button>
             <span class="ms-auto small text-muted fst-italic">Los costos del producto NO incluyen ITBIS</span>
         </div>
