@@ -15,7 +15,7 @@ Este módulo agrega un botón para alternar entre mosaico y LISTA:
 La elección se recuerda por equipo (queda guardada en el navegador de esa
 estación), así cada puesto trabaja como prefiera.
     """,
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

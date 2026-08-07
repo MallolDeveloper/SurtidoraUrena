@@ -49,5 +49,18 @@
             padding-left: 10px;
             white-space: nowrap;
         }
+
+        // El contador de la cuenta está posicionado en absoluto para la
+        // esquina del mosaico; en la fila tapaba el precio. Aquí vuelve al
+        // flujo normal y se sienta al final, después del precio.
+        // El contador vive dentro de .product-content: con margin-left auto
+        // se sienta al final del nombre, justo antes del precio.
+        .product-cart-qty {
+            position: static !important;
+            flex: 0 0 auto;
+            margin: 0 0 0 auto !important;
+            font-size: 0.9rem !important;
+            line-height: 1.4;
+        }
     }
 }
