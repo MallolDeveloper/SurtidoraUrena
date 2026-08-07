@@ -99,6 +99,10 @@
                             <span class="et">Dev. compras</span>
                             <span class="vl" t-esc="n(state.detalle.info.dev_compras)"/>
                         </div>
+                        <div class="surti-dato">
+                            <span class="et">OC pendientes</span>
+                            <span class="vl" t-esc="n(seleccion.ordenes_pendientes)"/>
+                        </div>
                     </div>
                     <div class="surti-venta" t-if="state.detalle.info.ultima_venta_fecha">
                         <span class="et">Última venta</span>
