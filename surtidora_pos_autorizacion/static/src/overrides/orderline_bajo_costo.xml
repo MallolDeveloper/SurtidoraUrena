@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<!-- La marca roja instantánea: aparece en cuanto el precio tecleado cae
+     bajo el costo, sin diálogos mientras se escribe. NO sale en el recibo
+     (vals.isReceipt) — es una alerta del cajero, no del cliente. -->
+<t t-name="surtidora_pos_autorizacion.Orderline" t-inherit="point_of_sale.Orderline" t-inherit-mode="extension">
+    <xpath expr="//ul[hasclass('info-list')]" position="inside">
+        <li t-if="!vals.isReceipt and line.surtiBajoCosto" class="surti-bajo-costo-alerta">
+            ⛔ BAJO COSTO — requiere autorización al cobrar
+        </li>
+    </xpath>
+</t>
+
+</templates>
