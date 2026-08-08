@@ -57,7 +57,7 @@ patch(ProductScreen.prototype, {
             opciones.push({
                 id: ++id,
                 label: `${uom.name} (${factor} ${nombreBase}) — ${fmt(tarifaCaja * factor)}`,
-                description: this._argumentoEmpaque(precioBase, tarifaCaja, nombreBase),
+                surti: this._argumentoEmpaque(precioBase, tarifaCaja, nombreBase, factor),
                 item: { qty: factor },
             });
             if (productTemplate.surtidora_caja_fraccionable) {
@@ -79,16 +79,23 @@ patch(ProductScreen.prototype, {
         return opciones;
     },
 
-    /** "41.00 por Paquete · ahorra 4.00 en cada uno" — el gancho de la venta.
-     * Si el empaque no trae descuento, solo se informa el equivalente. */
-    _argumentoEmpaque(precioBase, tarifaCaja, nombreBase) {
+    /**
+     * El guion de venta del empaque, en piezas para que la pantalla resalte
+     * lo que importa (reunión 7-ago):
+     * - el precio por unidad comprando el empaque, en negrita (punto 2);
+     * - cuánto ahorra por unidad Y en la caja completa (punto 3).
+     * Si el empaque no trae descuento solo se informa el equivalente: no se
+     * inventa un ahorro que no existe.
+     */
+    _argumentoEmpaque(precioBase, tarifaCaja, nombreBase, factor) {
         const fmt = (valor) => this.env.utils.formatCurrency(valor);
-        const equivalente = `${fmt(tarifaCaja)} ${_t("por")} ${nombreBase}`;
-        const ahorro = precioBase - tarifaCaja;
-        if (ahorro <= 0) {
-            return equivalente;
+        const argumento = { equivalente: fmt(tarifaCaja), unidad: nombreBase };
+        const ahorroUnidad = precioBase - tarifaCaja;
+        if (ahorroUnidad > 0) {
+            argumento.ahorroUnidad = fmt(ahorroUnidad);
+            argumento.ahorroTotal = fmt(ahorroUnidad * factor);
         }
-        return `${equivalente} · ${_t("ahorra")} ${fmt(ahorro)} ${_t("en cada uno")}`;
+        return argumento;
     },
 
     async _elegirEmpaque(productTemplate) {

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<!--
+    El guion de venta del empaque, debajo de cada opción del popup de unidad.
+    Va como pieza propia (no como texto plano en item.description) para poder
+    resaltar en negrita el precio por unidad y el ahorro — puntos 2 y 3 de la
+    reunión del 7-ago con Adelso.
+-->
+<t t-name="surtidora_pos_empaques.SelectionPopup" t-inherit="point_of_sale.SelectionPopup" t-inherit-mode="extension">
+    <xpath expr="//span[@t-esc='item.description']" position="after">
+        <span class="surti-arg" t-if="item.surti">
+            <b class="surti-arg-precio" t-esc="item.surti.equivalente"/>
+            <span class="surti-arg-txt" t-esc="' por ' + item.surti.unidad"/>
+            <t t-if="item.surti.ahorroTotal">
+                <span class="surti-arg-txt"> · ahorra </span>
+                <b class="surti-arg-precio" t-esc="item.surti.ahorroUnidad"/>
+                <span class="surti-arg-txt"> c/u · </span>
+                <b class="surti-arg-precio" t-esc="item.surti.ahorroTotal"/>
+                <span class="surti-arg-txt"> en la caja completa</span>
+            </t>
+        </span>
+    </xpath>
+</t>
+
+</templates>
