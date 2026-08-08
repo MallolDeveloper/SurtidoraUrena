@@ -97,6 +97,17 @@ export class SugeridoPantalla extends Component {
         return this.state.filas.find((f) => f.product_id === this.state.seleccionId) || null;
     }
 
+    /**
+     * El histórico de 12 meses se parte en dos tablas de 6 puestas lado a
+     * lado: así el comprador ve el año completo de una sola mirada, sin
+     * desplazarse (pedido de Adelso en la revisión del 7-ago).
+     */
+    get matrizPartida() {
+        const meses = this.state.detalle?.matriz || [];
+        const mitad = Math.ceil(meses.length / 2);
+        return [meses.slice(0, mitad), meses.slice(mitad)];
+    }
+
     async calcular() {
         if (!this.state.suplidorId) {
             this.notification.add("Elija un suplidor primero.", { type: "warning" });

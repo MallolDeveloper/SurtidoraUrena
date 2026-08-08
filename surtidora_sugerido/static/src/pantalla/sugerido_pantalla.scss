@@ -47,13 +47,29 @@
         border-radius: 4px;
         padding: 3px 8px;
     }
+    // Dos bloques de 6 meses lado a lado: el año completo sin desplazarse.
     .surti-matriz {
-        max-height: 190px;
-        overflow-y: auto;
-        min-width: 240px;
-        font-size: 12px;
+        flex: 0 0 auto;
+        min-width: 430px;
+        font-size: 12.5px;
+
+        table th {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #343a40;
+            white-space: nowrap;
+        }
+        table td { padding: 1px 6px; }
     }
-    .surti-info { max-height: 210px; overflow-y: auto; }
+    .surti-matriz-titulo {
+        font-size: 12px;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 2px;
+    }
+    // Sube de 210 a 265: ahora caben los 6 meses de cada bloque de la matriz
+    // y las etiquetas más grandes, sin scroll interno.
+    .surti-info { max-height: 265px; overflow-y: auto; }
 
     // Los datos del producto en cuadritos: etiqueta chica arriba, número
     // grande abajo. Se lee de un vistazo y se acomoda solo al ancho.
@@ -77,16 +93,19 @@
         padding: 3px 8px;
         line-height: 1.25;
 
+        // Legibilidad (Adelso, 7-ago): hay gente del equipo con dificultad
+        // de visión — etiquetas más grandes, en negrita y con contraste
+        // real, no el gris claro de antes.
         .et {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: .3px;
-            color: #6c757d;
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: .2px;
+            color: #495057;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .vl { font-size: 15px; font-weight: 700; }
+        .vl { font-size: 17px; font-weight: 700; }
     }
     // La sugerida es la cifra por la que se abre esta pantalla: se destaca.
     .surti-dato-clave {
@@ -114,10 +133,13 @@
     .surti-thead th {
         position: sticky;
         top: 0;
-        background: var(--surti-th-bg, #f1f1f1);
+        background: var(--surti-th-bg, #e9ecef);
         cursor: pointer;
         white-space: nowrap;
         z-index: 1;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #343a40;
     }
     .surti-prod {
         max-width: 320px;
@@ -130,9 +152,27 @@
     .surti-costo { width: 95px; border: 1px solid #ccc; border-radius: 4px; padding: 1px 5px; }
     .surti-buscar-prod { width: 230px; }
     .surti-ficha { color: #714b67; }
+    // Reparto de alto (Adelso, 7-ago): en ADG ve 12 líneas de producto y le
+    // alcanza; aquí salían ~20 y los bloques de abajo quedaban fuera de
+    // vista. El grid se topa y el espacio sobrante se lo queda el pie.
+    .surti-grid { max-height: 40vh; }
     .surti-bottom {
-        max-height: 220px;
+        flex: 1 1 auto;
+        min-height: 170px;
         overflow-y: auto;
-        font-size: 12px;
+        font-size: 12.5px;
+
+        table th {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #343a40;
+            white-space: nowrap;
+        }
+    }
+    .surti-bottom-titulo {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 3px;
     }
 }

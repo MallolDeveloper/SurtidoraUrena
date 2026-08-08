@@ -76,8 +76,10 @@
                             <span class="vl" t-esc="n(state.detalle.info.costo_promedio)"/>
                         </div>
                         <div class="surti-dato">
-                            <span class="et">Días desde compra</span>
-                            <span class="vl" t-esc="state.detalle.info.dias_desde_compra"/>
+                            <span class="et">Días transcurridos</span>
+                            <span class="vl" t-if="state.detalle.info.dias_desde_compra !== null"
+                                  t-esc="state.detalle.info.dias_desde_compra"/>
+                            <span class="vl text-muted" t-else="">—</span>
                         </div>
                         <div class="surti-dato">
                             <span class="et">Existencia (base)</span>
@@ -115,18 +117,23 @@
                 <div class="small text-muted" t-if="state.cargandoDetalle">Cargando detalle...</div>
             </div>
             <div class="surti-matriz" t-if="state.detalle">
-                <table class="table table-sm mb-0">
-                    <thead><tr><th>Mes</th><th class="text-end">Compras</th><th class="text-end">Ventas</th></tr></thead>
-                    <tbody>
-                        <t t-foreach="state.detalle.matriz" t-as="mes" t-key="mes.mes">
-                            <tr t-att-class="mes.vendido > mes.comprado ? 'table-warning' : ''">
-                                <td t-esc="mes.mes"/>
-                                <td class="text-end" t-esc="n(mes.comprado, 0)"/>
-                                <td class="text-end" t-esc="n(mes.vendido, 0)"/>
-                            </tr>
-                        </t>
-                    </tbody>
-                </table>
+                <div class="surti-matriz-titulo">Comprado vs. vendido — 12 meses</div>
+                <div class="d-flex gap-2">
+                    <t t-foreach="matrizPartida" t-as="bloque" t-key="bloque_index">
+                        <table class="table table-sm mb-0 flex-fill">
+                            <thead><tr><th>Mes</th><th class="text-end">Compras</th><th class="text-end">Ventas</th></tr></thead>
+                            <tbody>
+                                <t t-foreach="bloque" t-as="mes" t-key="mes.mes">
+                                    <tr t-att-class="mes.vendido > mes.comprado ? 'table-warning' : ''">
+                                        <td t-esc="mes.mes"/>
+                                        <td class="text-end" t-esc="n(mes.comprado, 0)"/>
+                                        <td class="text-end" t-esc="n(mes.vendido, 0)"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                </div>
             </div>
         </div>
 
@@ -200,7 +207,7 @@
 
         <div class="surti-bottom d-flex gap-2 p-2 border-top" t-if="state.detalle">
             <div class="w-50">
-                <div class="fw-bold small mb-1">Órdenes de compra pendientes</div>
+                <div class="surti-bottom-titulo">Órdenes de compra pendientes</div>
                 <table class="table table-sm mb-0">
                     <thead><tr><th>Orden</th><th>Fecha</th><th>Suplidor</th><th class="text-end">Ordenada</th><th class="text-end">Pendiente</th><th>Unidad</th></tr></thead>
                     <tbody>
@@ -217,7 +224,7 @@
                 </table>
             </div>
             <div class="w-50">
-                <div class="fw-bold small mb-1">Últimas diez compras del producto (todos los suplidores)</div>
+                <div class="surti-bottom-titulo">Últimas diez compras del producto (todos los suplidores)</div>
                 <table class="table table-sm mb-0">
                     <thead><tr><th>Fecha</th><th class="text-end">Cantidad</th><th>Unidad</th><th class="text-end">Costo</th><th>Suplidor</th></tr></thead>
                     <tbody>
