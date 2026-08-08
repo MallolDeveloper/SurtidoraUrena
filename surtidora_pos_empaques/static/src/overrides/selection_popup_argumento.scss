@@ -1,0 +1,16 @@
+// Guion de venta bajo cada empaque del popup de unidad.
+// El cajero tiene que poder leer la cifra de un vistazo mientras habla con
+// el cliente: por eso los números van en negrita y en verde de "ahorro".
+.surti-arg {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.85rem;
+    line-height: 1.3;
+}
+.surti-arg-precio {
+    font-weight: 700;
+    color: #0d6e56;
+}
+.surti-arg-txt {
+    color: #5b626b;
+}
