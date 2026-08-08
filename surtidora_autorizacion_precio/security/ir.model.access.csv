@@ -3,3 +3,5 @@ access_autorizacion_user,surtidora.autorizacion.precio user,model_surtidora_auto
 access_autorizacion_admin,surtidora.autorizacion.precio admin,model_surtidora_autorizacion_precio,sales_team.group_sale_manager,1,1,0,0
 access_wizard,surtidora.autorizar.precio.wizard,model_surtidora_autorizar_precio_wizard,base.group_user,1,1,1,1
 access_wizard_linea,surtidora.autorizar.precio.linea,model_surtidora_autorizar_precio_linea,base.group_user,1,1,1,1
+access_motivo_user,surtidora.motivo.descuento user,model_surtidora_motivo_descuento,base.group_user,1,0,0,0
+access_motivo_admin,surtidora.motivo.descuento admin,model_surtidora_motivo_descuento,sales_team.group_sale_manager,1,1,1,1

@@ -30,7 +30,14 @@ class AutorizacionPrecio(models.Model):
         'res.users', string='Autorizado por', required=True,
         help='Supervisor cuyo PIN validó la autorización (RB-01).')
     partner_id = fields.Many2one('res.partner', string='Cliente')
-    nota = fields.Char(string='Motivo')
+    motivo_id = fields.Many2one(
+        'surtidora.motivo.descuento', string='Motivo', ondelete='restrict',
+        help='Del catálogo de motivos (punto 6, reunión 7-ago): permite '
+             'analizar qué motivos generan más descuentos.')
+    nota = fields.Char(string='Nota')
+    origen = fields.Selection(
+        [('backend', 'Cotización'), ('pos', 'Mostrador (POS)')],
+        default='backend', string='Origen')
 
     def sigue_vigente_para(self, line):
         """La autorización cubre la línea solo si producto, unidad y precio siguen

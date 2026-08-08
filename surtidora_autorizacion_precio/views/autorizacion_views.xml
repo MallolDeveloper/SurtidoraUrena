@@ -15,6 +15,8 @@
                 <field name="precio_autorizado"/>
                 <field name="solicitante_id"/>
                 <field name="autorizador_id"/>
+                <field name="motivo_id"/>
+                <field name="origen" optional="show"/>
                 <field name="nota" optional="hide"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="company_id" groups="base.group_multi_company" optional="hide"/>
@@ -38,4 +40,35 @@
               action="action_autorizacion_precio"
               groups="sales_team.group_sale_manager,surtidora_autorizacion_precio.group_autorizador_precio"
               sequence="90"/>
+
+    <!-- Catálogo de motivos (punto 6): lista editable para gerencia -->
+    <record id="view_motivo_descuento_list" model="ir.ui.view">
+        <field name="name">surtidora.motivo.descuento.list</field>
+        <field name="model">surtidora.motivo.descuento</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_motivo_descuento" model="ir.actions.act_window">
+        <field name="name">Motivos de descuento</field>
+        <field name="res_model">surtidora.motivo.descuento</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin motivos configurados</p>
+            <p>Los motivos que el cajero/vendedor elige al autorizar un descuento
+               o una venta bajo costo. Se eligen de esta lista para poder analizar
+               cuáles generan más descuentos.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_motivo_descuento"
+              name="Motivos de descuento"
+              parent="sale.sale_menu_root"
+              action="action_motivo_descuento"
+              groups="sales_team.group_sale_manager"
+              sequence="91"/>
 </odoo>

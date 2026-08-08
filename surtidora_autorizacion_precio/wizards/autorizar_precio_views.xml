@@ -19,6 +19,7 @@
                     </list>
                 </field>
                 <group>
+                    <field name="motivo_id" options="{'no_create_edit': True, 'no_quick_create': True}"/>
                     <field name="pin" password="True"/>
                     <field name="nota"/>
                 </group>

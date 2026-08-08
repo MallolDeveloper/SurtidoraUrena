@@ -12,7 +12,9 @@ class AutorizarPrecioWizard(models.TransientModel):
     order_id = fields.Many2one('sale.order', required=True, ondelete='cascade')
     linea_ids = fields.One2many('surtidora.autorizar.precio.linea', 'wizard_id')
     pin = fields.Char(string='PIN del supervisor')
-    nota = fields.Char(string='Motivo (opcional)')
+    motivo_id = fields.Many2one(
+        'surtidora.motivo.descuento', string='Motivo', required=True)
+    nota = fields.Char(string='Nota (opcional)')
 
     @api.model
     def default_get(self, fields_list):
@@ -54,6 +56,7 @@ class AutorizarPrecioWizard(models.TransientModel):
                 'solicitante_id': self.env.user.id,
                 'autorizador_id': autorizador.id,
                 'partner_id': line.order_partner_id.id,
+                'motivo_id': self.motivo_id.id,
                 'nota': self.nota,
             })
         return {'type': 'ir.actions.act_window_close'}

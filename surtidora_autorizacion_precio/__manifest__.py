@@ -15,7 +15,7 @@ Control de precios en ventas (Levantamiento Surtidora Ureña):
 El núcleo (reglas + PIN + auditoría) es independiente de la pantalla de venta:
 la pantalla definitiva de la Fase C lo reutiliza tal cual.
     """,
-    'version': '19.0.1.0.2',
+    'version': '19.0.2.0.0',
     'category': 'Sales',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
@@ -23,6 +23,7 @@ la pantalla definitiva de la Fase C lo reutiliza tal cual.
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
+        'data/motivos_data.xml',
         'views/autorizacion_views.xml',
         'views/sale_order_views.xml',
         'views/res_company_views.xml',
