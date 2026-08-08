@@ -199,7 +199,9 @@ class SugeridoMotor(models.AbstractModel):
         ultima = self._ultimas_compras(producto, company, limite=1)
         ultima = ultima[0] if ultima else {}
         hoy = fields.Date.context_today(self)
-        dias_desde = (hoy - ultima['fecha'].date()).days if ultima.get('fecha') else 0
+        # None (no cero) cuando el producto nunca se ha comprado: en pantalla
+        # se muestra "—". Un 0 se lee como "lo compré hoy" y es mentira.
+        dias_desde = (hoy - ultima['fecha'].date()).days if ultima.get('fecha') else None
         venta = self._ultima_venta(producto, company)
         return {
             'ultimo_costo_base': ultima.get('costo_base', 0.0),
