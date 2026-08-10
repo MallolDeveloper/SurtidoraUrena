@@ -60,8 +60,8 @@
             <span class="ms-auto small text-muted fst-italic">Los costos del producto NO incluyen ITBIS</span>
         </div>
 
-        <div class="surti-info d-flex gap-2 p-2 border-bottom" t-if="seleccion">
-            <div class="flex-grow-1">
+        <div class="surti-info d-flex gap-3 p-2 border-bottom" t-if="seleccion">
+            <div class="surti-info-izq">
                 <div class="fw-bold text-primary mb-1">
                     <t t-esc="seleccion.referencia"/> — <t t-esc="seleccion.producto"/>
                 </div>
@@ -152,9 +152,9 @@
                         <th class="text-end">OC pend.</th>
                         <th class="text-end" t-on-click="() => this.ordenarPor('cant_necesaria')">Necesaria</th>
                         <th class="text-end" t-on-click="() => this.ordenarPor('cant_sugerida')">Sugerida</th>
-                        <th class="text-end">Cantidad a ordenar</th>
-                        <th class="text-end">Costo</th>
-                        <th></th>
+                        <th class="text-end surti-col-input">A ordenar</th>
+                        <th class="text-end surti-col-input">Costo</th>
+                        <th class="surti-col-ficha"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -173,20 +173,20 @@
                             <td class="text-end" t-esc="n(fila.cant_necesaria)"/>
                             <td class="text-end" t-att-class="fila.cant_sugerida > 0 ? 'text-success fw-bold' : 'text-muted'"
                                 t-esc="n(fila.cant_sugerida)"/>
-                            <td class="text-end">
-                                <input type="number" min="0" class="surti-qty text-end"
+                            <td class="surti-col-input">
+                                <input type="number" min="0" class="surti-input-grid text-end"
                                        t-att-value="fila.cantidad_ordenar || ''"
                                        t-on-click.stop=""
                                        t-on-change="(ev) => this.actualizarCantidad(fila, ev)"/>
                             </td>
-                            <td class="text-end">
-                                <input type="number" min="0" step="0.01" class="surti-costo text-end"
+                            <td class="surti-col-input">
+                                <input type="number" min="0" step="0.01" class="surti-input-grid text-end"
                                        t-att-value="fila.costo_uom_compra"
                                        t-on-click.stop=""
                                        t-on-change="(ev) => this.actualizarCosto(fila, ev)"
                                        title="Costo para esta orden. Para cambiarlo en el producto use el botón de al lado."/>
                             </td>
-                            <td class="text-center">
+                            <td class="text-center surti-col-ficha">
                                 <button class="btn btn-sm btn-link p-0 surti-ficha"
                                         t-on-click.stop="() => this.abrirProducto(fila)"
                                         title="Abrir la ficha del producto (cambiar el costo de forma permanente)">

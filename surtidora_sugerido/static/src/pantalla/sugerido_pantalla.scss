@@ -47,22 +47,24 @@
         border-radius: 4px;
         padding: 3px 8px;
     }
-    // Dos bloques de 6 meses lado a lado: el año completo sin desplazarse.
+    // Dos bloques de 6 meses lado a lado. La matriz se queda con TODO el
+    // ancho que el bloque de cuadros ya no usa: celdas más holgadas y
+    // letra un punto mayor.
     .surti-matriz {
-        flex: 0 0 auto;
+        flex: 1 1 auto;
         min-width: 460px;
-        font-size: 13.5px;
+        font-size: 14px;
 
         table th {
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 700;
             color: #212529;
             white-space: nowrap;
         }
-        table td { padding: 1px 6px; }
+        table td { padding: 2px 12px; }
     }
     .surti-matriz-titulo {
-        font-size: 13.5px;
+        font-size: 14px;
         font-weight: 700;
         color: #212529;
         margin-bottom: 2px;
@@ -81,15 +83,20 @@
 
     // Los datos del producto en cuadritos: etiqueta chica arriba, número
     // grande abajo. Se lee de un vistazo y se acomoda solo al ancho.
-    // Cuadro de 3x3: nueve datos, tres filas parejas.
+    // El bloque izquierdo (nombre + 9 cuadros + última venta) NO se estira:
+    // ahí van números cortos. El ancho sobrante se lo lleva la matriz de
+    // 12 meses, que es la que lo aprovecha (pedido del 10-ago).
+    .surti-info-izq { flex: 0 0 auto; }
+
+    // Cuadro de 3x3 compacto: columnas de ancho fijo, no fracciones de
+    // un contenedor ancho.
     .surti-datos {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, 158px);
         gap: 5px;
 
-        // En pantallas angostas 4 columnas aprietan demasiado el número.
         @media (max-width: 1200px) {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, 158px);
         }
     }
     .surti-dato {
@@ -101,9 +108,8 @@
         padding: 3px 8px;
         line-height: 1.25;
 
-        // Legibilidad (Adelso, 7-ago, reforzada el 8-ago): hay gente del
-        // equipo con dificultad de visión — etiquetas grandes, en negrita
-        // plena y en el color más oscuro del tema.
+        // Legibilidad (Adelso, 7-ago): etiquetas grandes, negrita plena y
+        // el color más oscuro del tema.
         .et {
             font-size: 13px;
             font-weight: 700;
@@ -158,8 +164,16 @@
         white-space: nowrap;
     }
     .surti-sel { outline: 2px solid #714b67; outline-offset: -2px; }
-    .surti-qty { width: 90px; border: 1px solid #ccc; border-radius: 4px; padding: 1px 5px; }
-    .surti-costo { width: 95px; border: 1px solid #ccc; border-radius: 4px; padding: 1px 5px; }
+    // Columnas de captura con ancho FIJO y caja que llena la columna: la
+    // cajita queda exactamente debajo de su encabezado, sin flotar.
+    .surti-col-input { width: 108px; }
+    .surti-col-ficha { width: 36px; }
+    .surti-input-grid {
+        width: 100%;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 1px 5px;
+    }
     .surti-buscar-prod { width: 230px; }
     .surti-ficha { color: #714b67; }
     // Reparto de alto (Adelso, 7-ago): en ADG ve 12 líneas de producto y le
