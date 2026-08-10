@@ -50,26 +50,34 @@
     // Dos bloques de 6 meses lado a lado: el año completo sin desplazarse.
     .surti-matriz {
         flex: 0 0 auto;
-        min-width: 430px;
-        font-size: 12.5px;
+        min-width: 460px;
+        font-size: 13.5px;
 
         table th {
-            font-size: 11.5px;
+            font-size: 13px;
             font-weight: 700;
-            color: #343a40;
+            color: #212529;
             white-space: nowrap;
         }
         table td { padding: 1px 6px; }
     }
     .surti-matriz-titulo {
-        font-size: 12px;
+        font-size: 13.5px;
         font-weight: 700;
-        color: #495057;
+        color: #212529;
         margin-bottom: 2px;
     }
-    // Sube de 210 a 265: ahora caben los 6 meses de cada bloque de la matriz
-    // y las etiquetas más grandes, sin scroll interno.
-    .surti-info { max-height: 265px; overflow-y: auto; }
+    // Alto suficiente para los 6 meses por bloque y la tipografía grande,
+    // sin scroll interno.
+    .surti-info { max-height: 300px; overflow-y: auto; }
+
+    // Los rótulos de los filtros de arriba también suben (eran .small de
+    // Bootstrap, ~11px).
+    .surti-toolbar label {
+        font-size: 13px !important;
+        font-weight: 700;
+        color: #212529;
+    }
 
     // Los datos del producto en cuadritos: etiqueta chica arriba, número
     // grande abajo. Se lee de un vistazo y se acomoda solo al ancho.
@@ -93,19 +101,19 @@
         padding: 3px 8px;
         line-height: 1.25;
 
-        // Legibilidad (Adelso, 7-ago): hay gente del equipo con dificultad
-        // de visión — etiquetas más grandes, en negrita y con contraste
-        // real, no el gris claro de antes.
+        // Legibilidad (Adelso, 7-ago, reforzada el 8-ago): hay gente del
+        // equipo con dificultad de visión — etiquetas grandes, en negrita
+        // plena y en el color más oscuro del tema.
         .et {
-            font-size: 11.5px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 700;
             letter-spacing: .2px;
-            color: #495057;
+            color: #212529;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .vl { font-size: 17px; font-weight: 700; }
+        .vl { font-size: 19px; font-weight: 700; }
     }
     // La sugerida es la cifra por la que se abre esta pantalla: se destaca.
     .surti-dato-clave {
@@ -116,7 +124,7 @@
 
     .surti-venta {
         margin-top: 5px;
-        font-size: 12px;
+        font-size: 13.5px;
         color: #0d6e56;
         background: #e7f4f0;
         border-radius: 5px;
@@ -137,10 +145,12 @@
         cursor: pointer;
         white-space: nowrap;
         z-index: 1;
-        font-size: 12.5px;
+        font-size: 14px;
         font-weight: 700;
-        color: #343a40;
+        color: #212529;
     }
+    // el cuerpo de la tabla acompaña a los encabezados
+    .surti-grid td { font-size: 13.5px; }
     .surti-prod {
         max-width: 320px;
         overflow: hidden;
@@ -160,19 +170,19 @@
         flex: 1 1 auto;
         min-height: 170px;
         overflow-y: auto;
-        font-size: 12.5px;
+        font-size: 13.5px;
 
         table th {
-            font-size: 11.5px;
+            font-size: 13px;
             font-weight: 700;
-            color: #343a40;
+            color: #212529;
             white-space: nowrap;
         }
     }
     .surti-bottom-titulo {
-        font-size: 12.5px;
+        font-size: 14px;
         font-weight: 700;
-        color: #495057;
+        color: #212529;
         margin-bottom: 3px;
     }
 }
