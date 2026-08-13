@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<!-- RB-15: sin permiso de gestión, los botones "Crear" ni aparecen
+     (el guard de editPartner cubre además la edición por fila). -->
+<t t-name="surtidora_pos_cliente_cedula.PartnerList" t-inherit="point_of_sale.PartnerList" t-inherit-mode="extension">
+    <xpath expr="(//button[@aria-label='Add a customer'])[1]" position="attributes">
+        <attribute name="t-if">!ui.isSmall and this.pos.cashier._role !== 'minimal' and pos.surtiGestionClientes and (!pos.config.module_pos_hr or pos.cashier?._role === 'manager')</attribute>
+    </xpath>
+    <xpath expr="(//button[@aria-label='Add a customer'])[2]" position="attributes">
+        <attribute name="t-if">ui.isSmall and this.pos.cashier._role !== 'minimal' and pos.surtiGestionClientes and (!pos.config.module_pos_hr or pos.cashier?._role === 'manager')</attribute>
+    </xpath>
+</t>
+
+</templates>

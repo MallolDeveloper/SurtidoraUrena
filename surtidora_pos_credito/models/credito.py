@@ -39,7 +39,11 @@ class PosCredito(models.AbstractModel):
         comercial = cliente.commercial_partner_id
         if not comercial.use_partner_credit_limit or comercial.credit_limit <= 0:
             return self._veredicto(False, 'sin_credito', cliente=cliente)
-        balance = comercial.credit
+        # comercial.credit solo ve asientos contabilizados; el crédito fiado
+        # HOY (pay_later) no toca contabilidad hasta el cierre de sesión.
+        # Sin este término el cliente podría exceder su límite comprando
+        # varias veces el mismo día (revisión adversaria 13-ago).
+        balance = comercial.credit + self._credito_en_sesion(comercial)
         disponible = comercial.credit_limit - balance
         rounding = self.env.company.currency_id.rounding
         if float_compare(monto, disponible, precision_rounding=rounding) > 0:
@@ -47,6 +51,17 @@ class PosCredito(models.AbstractModel):
                                    balance=balance, disponible=disponible)
         return self._veredicto(True, '', cliente=cliente,
                                balance=balance, disponible=disponible)
+
+    def _credito_en_sesion(self, comercial):
+        """Pagos "cuenta cliente" de sesiones POS aún abiertas: deuda real
+        que la contabilidad todavía no registró."""
+        pagos = self.sudo().env['pos.payment'].search([
+            ('payment_method_id.type', '=', 'pay_later'),
+            ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
+            ('pos_order_id.session_id.state', '!=', 'closed'),
+            ('pos_order_id.company_id', '=', self.env.company.id),
+        ])
+        return sum(pagos.mapped('amount'))
 
     def _veredicto(self, permitido, motivo, cliente=None, balance=0.0,
                    disponible=0.0):

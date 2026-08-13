@@ -30,3 +30,16 @@
         }
     }
 }
+
+// REQ-V02 — CxC del cliente, arriba del panel. Rojo cuando hay vencido.
+.surti-pos-balance {
+    border: 1px solid #d9dde2;
+    border-radius: 6px;
+    padding: 4px 8px 6px;
+    margin-bottom: 8px;
+    background: #fff;
+
+    &.surti-bal-rojo { border-color: #a4373a; background: #fdeced; }
+    .surti-bal-vencido td { color: #a4373a; }
+}
+.surti-bal-favor td { color: #0d6e56; }

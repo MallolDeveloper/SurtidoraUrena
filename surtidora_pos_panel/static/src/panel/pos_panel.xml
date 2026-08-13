@@ -5,6 +5,28 @@
     <xpath expr="//div[hasclass('rightpane')]" position="after">
         <div class="surti-pos-panel d-flex flex-column border-start bg-view p-2 overflow-y-auto"
              t-if="!ui.isSmall">
+            <!-- REQ-V02: la CxC del cliente elegido, siempre arriba del panel -->
+            <div class="surti-pos-balance"
+                 t-if="pos.surtiBalance and pos.getOrder()?.getPartner()?.id === pos.surtiBalance.partner_id"
+                 t-att-class="pos.surtiBalance.vencido > 0 ? 'surti-bal-rojo' : ''">
+                <div class="surti-pos-seccion">CxC del cliente</div>
+                <table class="surti-pos-tabla">
+                    <tr><td>Balance total</td>
+                        <td class="text-end fw-bolder" t-esc="surtiN(pos.surtiBalance.total)"/></tr>
+                    <tr t-if="pos.surtiBalance.vencido > 0" class="surti-bal-vencido">
+                        <td>Vencido</td>
+                        <td class="text-end fw-bolder" t-esc="surtiN(pos.surtiBalance.vencido)"/></tr>
+                    <tr><td>Por vencer</td>
+                        <td class="text-end" t-esc="surtiN(pos.surtiBalance.por_vencer)"/></tr>
+                    <tr t-if="pos.surtiBalance.en_sesion > 0"><td>· fiado hoy (sin cerrar)</td>
+                        <td class="text-end" t-esc="surtiN(pos.surtiBalance.en_sesion)"/></tr>
+                    <tr t-if="pos.surtiBalance.a_favor > 0" class="surti-bal-favor">
+                        <td>Saldo a favor</td>
+                        <td class="text-end" t-esc="surtiN(pos.surtiBalance.a_favor)"/></tr>
+                    <tr t-if="pos.surtiBalance.limite > 0"><td>Límite de crédito</td>
+                        <td class="text-end" t-esc="surtiN(pos.surtiBalance.limite)"/></tr>
+                </table>
+            </div>
             <t t-if="surtiPanel.datos">
                 <div class="fw-bolder mb-1 surti-pos-titulo" t-esc="surtiPanel.datos.producto"/>
 

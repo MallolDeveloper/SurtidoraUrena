@@ -61,8 +61,11 @@ patch(ProductScreen.prototype, {
         if (!esProductoLocal) {
             const cliente = await this._getPartnerByBarcode({ code: code.base_code });
             if (cliente) {
-                if (this.currentOrder.get_partner() !== cliente) {
-                    this.currentOrder.set_partner(cliente);
+                // Vía oficial del store (v19 renombró set_partner→setPartner;
+                // además así se disparan los efectos colgados del cambio de
+                // cliente, como la carga del balance CxC del panel).
+                if (this.currentOrder.getPartner() !== cliente) {
+                    this.pos.setPartnerToCurrentOrder(cliente);
                 }
                 this.numberBuffer.reset();
                 return;

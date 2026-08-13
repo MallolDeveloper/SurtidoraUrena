@@ -3,7 +3,7 @@
 muestra. La pantalla solo pinta (mismo principio del motor del sugerido)."""
 from datetime import datetime
 
-from odoo import _, api, models
+from odoo import _, api, fields, models
 from odoo.exceptions import AccessError
 
 
@@ -34,6 +34,60 @@ class PosPanel(models.AbstractModel):
             'historial': self._historial_cliente(producto, cliente) if cliente else [],
             'cliente': cliente.display_name if cliente else '',
         }
+
+    @api.model
+    def balance_cliente(self, partner_id):
+        """REQ-V02: CxC del cliente al seleccionarlo — vencida y por vencer.
+
+        Es la pareja del candado de crédito: el candado bloquea al exceder
+        el límite; esto le muestra al cajero CUÁNTO debe el cliente antes
+        de llegar ahí. El balance vive en la entidad comercial (matriz)."""
+        if not self.env.user.has_group('point_of_sale.group_pos_user'):
+            raise AccessError(_('Solo usuarios del punto de venta.'))
+        env = self.sudo().env
+        cliente = env['res.partner'].browse(int(partner_id))
+        comercial = cliente.commercial_partner_id
+        hoy = fields.Date.context_today(self)
+        lineas = env['account.move.line'].search([
+            ('partner_id', '=', comercial.id),
+            ('account_id.account_type', '=', 'asset_receivable'),
+            ('parent_state', '=', 'posted'),
+            ('amount_residual', '!=', 0.0),
+            ('company_id', '=', self.env.company.id),
+        ])
+        # Débitos y créditos por separado: un pago a cuenta o una NC sin
+        # conciliar (residual NEGATIVO) es saldo a favor, no deuda "vencida".
+        # Y "vencido" exige vencimiento REAL: las líneas sin date_maturity
+        # (p. ej. el asiento de cierre de sesión del POS) van a "por vencer"
+        # para no pintar de rojo deuda de ayer con acuerdo a 30 días.
+        vencido = sum(l.amount_residual for l in lineas
+                      if l.amount_residual > 0 and l.date_maturity and l.date_maturity < hoy)
+        deuda = sum(l.amount_residual for l in lineas if l.amount_residual > 0)
+        a_favor = -sum(l.amount_residual for l in lineas if l.amount_residual < 0)
+        en_sesion = self._credito_en_sesion(env, comercial)
+        return {
+            'partner_id': cliente.id,
+            'total': deuda + en_sesion - a_favor,
+            'vencido': vencido,
+            'por_vencer': (deuda - vencido) + en_sesion,
+            'en_sesion': en_sesion,
+            'a_favor': a_favor,
+            'limite': comercial.credit_limit if comercial.use_partner_credit_limit else 0.0,
+        }
+
+    @api.model
+    def _credito_en_sesion(self, env, comercial):
+        """Crédito fiado HOY que la contabilidad aún no ve: los pagos
+        "cuenta cliente" (pay_later) solo generan asientos al CERRAR la
+        sesión del POS. Sin este término, un cliente podría exceder su
+        límite comprando varias veces el mismo día."""
+        pagos = env['pos.payment'].search([
+            ('payment_method_id.type', '=', 'pay_later'),
+            ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
+            ('pos_order_id.session_id.state', '!=', 'closed'),
+            ('pos_order_id.company_id', '=', self.env.company.id),
+        ])
+        return sum(pagos.mapped('amount'))
 
     def _precios_por_unidad(self, producto, pricelist):
         """Precio de la unidad base y de cada empaque, con el equivalente por

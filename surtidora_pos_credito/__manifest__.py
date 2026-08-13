@@ -24,7 +24,7 @@ de límite de crédito por cliente en la compañía.
 El mayoreo con negociación formal (cotización + botón de negociación) sigue
 por el backend de Ventas.
     """,
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
