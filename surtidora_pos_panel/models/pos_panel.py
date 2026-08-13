@@ -81,8 +81,8 @@ class PosPanel(models.AbstractModel):
         "cuenta cliente" (pay_later) solo generan asientos al CERRAR la
         sesión del POS. Sin este término, un cliente podría exceder su
         límite comprando varias veces el mismo día."""
-        pagos = env['pos.payment'].search([
-            ('payment_method_id.type', '=', 'pay_later'),
+        pagos = env['pos.payment'].search([  # pay_later = metodo SIN diario (type no es almacenado)
+            ('payment_method_id.journal_id', '=', False),
             ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
             ('pos_order_id.session_id.state', '!=', 'closed'),
             ('pos_order_id.company_id', '=', self.env.company.id),
