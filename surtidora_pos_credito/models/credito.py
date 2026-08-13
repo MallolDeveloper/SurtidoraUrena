@@ -56,7 +56,7 @@ class PosCredito(models.AbstractModel):
         """Pagos "cuenta cliente" de sesiones POS aún abiertas: deuda real
         que la contabilidad todavía no registró."""
         pagos = self.sudo().env['pos.payment'].search([
-            ('payment_method_id.type', '=', 'pay_later'),
+            ('payment_method_id.journal_id', '=', False),
             ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
             ('pos_order_id.session_id.state', '!=', 'closed'),
             ('pos_order_id.company_id', '=', self.env.company.id),
