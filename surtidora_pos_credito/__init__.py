@@ -10,14 +10,16 @@ def configurar_credito_pos(env):
       campo "Límite de crédito" aparezca en la ficha del cliente — ese campo
       es la autorización que el candado verifica.
     """
-    metodo = env.ref('surtidora_pos_credito.metodo_pago_credito')
+    metodos = (env.ref('surtidora_pos_credito.metodo_pago_credito')
+               | env.ref('surtidora_pos_credito.metodo_pago_bono'))
     for config in env['pos.config'].search([]):
         # Odoo prohíbe tocar los métodos de una caja con sesión abierta —
         # esas se saltan (agregar el método a mano tras cerrar la sesión).
         if config.has_active_session:
             continue
-        if metodo not in config.payment_method_ids:
-            config.payment_method_ids = [(4, metodo.id)]
+        for metodo in metodos:
+            if metodo not in config.payment_method_ids:
+                config.payment_method_ids = [(4, metodo.id)]
     env['res.company'].search([]).filtered(
         lambda c: not c.account_use_credit_limit
     ).account_use_credit_limit = True

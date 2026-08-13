@@ -64,6 +64,16 @@ class PosPanel(models.AbstractModel):
                       if l.amount_residual > 0 and l.date_maturity and l.date_maturity < hoy)
         deuda = sum(l.amount_residual for l in lineas if l.amount_residual > 0)
         a_favor = -sum(l.amount_residual for l in lineas if l.amount_residual < 0)
+        # los bonos ya aplicados en sesiones abiertas consumen el saldo a
+        # favor aunque la contabilidad aún no lo registre (simetría con
+        # verificar_bono del módulo de crédito)
+        if 'surtidora_es_bono' in env['pos.payment.method']._fields:
+            a_favor = max(0.0, a_favor - sum(env['pos.payment'].search([
+                ('payment_method_id.surtidora_es_bono', '=', True),
+                ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
+                ('pos_order_id.session_id.state', '!=', 'closed'),
+                ('pos_order_id.company_id', '=', self.env.company.id),
+            ]).mapped('amount')))
         en_sesion = self._credito_en_sesion(env, comercial)
         return {
             'partner_id': cliente.id,
@@ -81,13 +91,17 @@ class PosPanel(models.AbstractModel):
         "cuenta cliente" (pay_later) solo generan asientos al CERRAR la
         sesión del POS. Sin este término, un cliente podría exceder su
         límite comprando varias veces el mismo día."""
-        pagos = env['pos.payment'].search([  # pay_later = metodo SIN diario (type no es almacenado)
+        dominio = [  # pay_later = metodo SIN diario (type no es almacenado)
             ('payment_method_id.journal_id', '=', False),
             ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
             ('pos_order_id.session_id.state', '!=', 'closed'),
             ('pos_order_id.company_id', '=', self.env.company.id),
-        ])
-        return sum(pagos.mapped('amount'))
+        ]
+        # los BONOS (surtidora_pos_credito) aplican saldo a favor del
+        # cliente, no son deuda nueva — se excluyen si el módulo está
+        if 'surtidora_es_bono' in env['pos.payment.method']._fields:
+            dominio.append(('payment_method_id.surtidora_es_bono', '=', False))
+        return sum(env['pos.payment'].search(dominio).mapped('amount'))
 
     def _precios_por_unidad(self, producto, pricelist):
         """Precio de la unidad base y de cada empaque, con el equivalente por

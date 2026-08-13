@@ -55,15 +55,19 @@ function mensajeCredito(veredicto, formatear) {
 }
 
 function montoCreditoDe(orden) {
+    // los BONOS también son pay_later pero NO son deuda nueva: aplican
+    // saldo a favor y tienen su propio candado (pos_bono.js)
     return orden.payment_ids
-        .filter((pago) => pago.payment_method_id.type === "pay_later")
+        .filter((pago) => pago.payment_method_id.type === "pay_later" &&
+            !pago.payment_method_id.surtidora_es_bono)
         .reduce((suma, pago) => suma + pago.amount, 0);
 }
 
 patch(PaymentScreen.prototype, {
-    /** Aviso temprano: no dejar ni crear la línea de crédito si no procede. */
+    /** Aviso temprano: no dejar ni crear la línea de crédito si no procede.
+     * Los bonos (pay_later también) tienen su propio candado. */
     async addNewPaymentLine(paymentMethod) {
-        if (paymentMethod.type === "pay_later") {
+        if (paymentMethod.type === "pay_later" && !paymentMethod.surtidora_es_bono) {
             const orden = this.currentOrder;
             const monto = orden.getDefaultAmountDueToPayIn(paymentMethod);
             const veredicto = await veredictoCredito(

@@ -7,4 +7,14 @@
         <field name="name">Crédito (Cuenta Cliente)</field>
         <field name="split_transactions" eval="True"/>
     </record>
+
+    <!-- REQ-V18 / política 12.4: el bono por devolución vive como nota de
+         crédito abierta del cliente y se APLICA como crédito en la compra
+         nueva (pago mixto). También pay_later + split: al cierre de sesión
+         genera el apunte por cliente que CxC concilia contra la NC. -->
+    <record id="metodo_pago_bono" model="pos.payment.method">
+        <field name="name">Bono / Nota de Crédito</field>
+        <field name="split_transactions" eval="True"/>
+        <field name="surtidora_es_bono" eval="True"/>
+    </record>
 </odoo>
