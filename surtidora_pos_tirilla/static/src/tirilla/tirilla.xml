@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <!-- Encabezado fiscal de la tirilla: razón social, RNC, dirección y
+         teléfono ARRIBA (la tirilla dominicana lleva el RNC en la cabeza;
+         el recibo nativo los ponía al pie). Solo en ventas: el comprobante
+         de entrada/salida de efectivo (CashMoveReceipt) usa este mismo
+         header con una orden desechable sin pos_reference y ya trae su
+         propio bloque de compañía. -->
+    <t t-name="surtidora_pos_tirilla.ReceiptHeader"
+       t-inherit="point_of_sale.ReceiptHeader" t-inherit-mode="extension">
+        <xpath expr="//img[hasclass('pos-receipt-logo')]" position="after">
+            <div t-if="order.pos_reference" class="text-center pt-1">
+                <div class="fw-bolder" t-esc="order.company.name"/>
+                <div t-if="order.company.vat">RNC: <t t-esc="order.company.vat"/></div>
+                <div t-if="order.company.street" t-esc="order.company.street"/>
+                <div t-if="order.company.city" t-esc="order.company.city"/>
+                <div t-if="order.company.phone">Tel: <t t-esc="order.company.phone"/></div>
+            </div>
+        </xpath>
+        <!-- En VENTAS el cajero va al pie (estilo ADG); en el comprobante de
+             cash in/out se conserva aquí — era su única mención del
+             responsable, con nombre completo. -->
+        <xpath expr="//div[hasclass('cashier')]" position="replace">
+            <div t-if="!order.pos_reference and order.user_id" class="cashier">
+                <div>Cajero: <t t-esc="order.user_id.name"/></div>
+            </div>
+        </xpath>
+    </t>
+
+    <t t-name="surtidora_pos_tirilla.OrderReceipt"
+       t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+        <!-- "Devuelta", como se dice en el mostrador -->
+        <xpath expr="//span[hasclass('label-change')]" position="replace">
+            <span class="label-change">Devuelta</span>
+        </xpath>
+        <!-- El pie estilo ADG (captura 20) REEMPLAZA el bloque nativo de
+             compañía del final: sin esto la tirilla imprimía RNC, dirección,
+             teléfono y nombre de caja DOS veces. Al vivir fuera del t-if
+             !basic_receipt, el pie sale también en el recibo básico.
+             Renglones apilados: en 80mm (~38 caracteres por línea) un solo
+             renglón con pipes se quiebra feo.
+             Los campos surtidora_* llegan del servidor dentro de la orden
+             (verdaderos aun en reimpresiones); el fallback cubre la orden
+             local recién creada. -->
+        <xpath expr="//div[hasclass('pos-config-name')]/../.." position="replace">
+            <div class="surti-pie-tirilla text-center fw-bolder pt-3">
+                <div>Caja: <t t-esc="order.surtidora_caja || order.config.name"/></div>
+                <div>Cajero: <t t-esc="order.surtidora_cajero || (order.user_id ? order.user_id.name : '')"/></div>
+                <div>Cuadre No.: <t t-esc="order.surtidora_cuadre || (order.session_id ? order.session_id.name : '')"/></div>
+            </div>
+        </xpath>
+    </t>
+</templates>
