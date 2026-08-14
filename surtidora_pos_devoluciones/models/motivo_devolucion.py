@@ -21,9 +21,8 @@ class MotivoDevolucion(models.Model):
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('nombre_unico', 'unique(name)', 'Ese motivo ya existe.'),
-    ]
+    # v19: _sql_constraints ya no existe (el registry lo ignora con warning)
+    _nombre_unico = models.Constraint('unique(name)', 'Ese motivo ya existe.')
 
     # *args/**kwargs: blindaje ante cambios de firma del mixin entre builds
     @api.model
