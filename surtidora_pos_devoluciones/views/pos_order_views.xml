@@ -39,16 +39,20 @@
             <field name="partner_id" position="after">
                 <field name="surtidora_motivo_dev_id"/>
             </field>
-            <search position="inside">
+            <!-- v19: el RNG de search NO acepta group con expand/string;
+                 se insertan los filtros en la zona de filtros del core y el
+                 group-by dentro del <group> pelado del core (deploy #38). -->
+            <filter name="order_date" position="before">
                 <filter string="Devoluciones" name="devoluciones"
                         domain="['|', ('amount_total', '&lt;', 0), ('lines.refunded_orderline_id', '!=', False)]"/>
                 <filter string="Devoluciones sin motivo" name="devoluciones_sin_motivo"
                         domain="['&amp;', ('surtidora_motivo_dev_id', '=', False), '|', ('amount_total', '&lt;', 0), ('lines.refunded_orderline_id', '!=', False)]"/>
-                <group expand="0" string="Agrupar por">
-                    <filter string="Motivo de devolución" name="por_motivo_dev"
-                            context="{'group_by': 'surtidora_motivo_dev_id'}"/>
-                </group>
-            </search>
+                <separator/>
+            </filter>
+            <xpath expr="//search/group" position="inside">
+                <filter string="Motivo de devolución" name="por_motivo_dev"
+                        domain="[]" context="{'group_by': 'surtidora_motivo_dev_id'}"/>
+            </xpath>
         </field>
     </record>
 </odoo>
