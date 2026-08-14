@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_motivo_ajuste_user,surtidora.motivo.ajuste user,model_surtidora_motivo_ajuste,base.group_user,1,0,0,0
+access_motivo_ajuste_admin,surtidora.motivo.ajuste admin,model_surtidora_motivo_ajuste,stock.group_stock_manager,1,1,1,1
+access_bitacora_manager,surtidora.ajuste.bitacora encargado,model_surtidora_ajuste_bitacora,stock.group_stock_manager,1,0,0,0
+access_bitacora_contable,surtidora.ajuste.bitacora contable,model_surtidora_ajuste_bitacora,account.group_account_readonly,1,0,0,0
+access_vale_nadie,surtidora.ajuste.vale solo lectura,model_surtidora_ajuste_vale,stock.group_stock_manager,1,0,0,0
+access_wizard_ajuste,surtidora.ajuste.autorizacion,model_surtidora_ajuste_autorizacion,stock.group_stock_user,1,1,1,1

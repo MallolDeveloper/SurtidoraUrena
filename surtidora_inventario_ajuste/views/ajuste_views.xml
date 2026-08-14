@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Asistente de autorización ─────────────────────────────── -->
+    <record id="view_ajuste_autorizacion_form" model="ir.ui.view">
+        <field name="name">surtidora.ajuste.autorizacion.form</field>
+        <field name="model">surtidora.ajuste.autorizacion</field>
+        <field name="arch" type="xml">
+            <form string="Autorizar ajuste de inventario">
+                <div class="alert alert-warning" role="alert">
+                    Un ajuste cambia la existencia sin comprar ni vender.
+                    Debe quedar registrado con su motivo y la clave de un
+                    supervisor.
+                </div>
+                <group>
+                    <field name="quant_ids" invisible="1"/>
+                    <field name="motivo_id" options="{'no_create': True}"/>
+                    <field name="nota" placeholder="Detalle para la bitácora"/>
+                    <field name="pin" password="True"/>
+                </group>
+                <separator string="Lo que se va a ajustar"/>
+                <field name="resumen" nolabel="1" readonly="1"/>
+                <footer>
+                    <button string="Autorizar y aplicar" name="action_confirmar"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Catálogo de motivos ───────────────────────────────────── -->
+    <record id="view_motivo_ajuste_list" model="ir.ui.view">
+        <field name="name">surtidora.motivo.ajuste.list</field>
+        <field name="model">surtidora.motivo.ajuste</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="nota" optional="show"/>
+                <field name="active" widget="boolean_toggle" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_motivo_ajuste" model="ir.actions.act_window">
+        <field name="name">Motivos de ajuste</field>
+        <field name="res_model">surtidora.motivo.ajuste</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- ── Bitácora ──────────────────────────────────────────────── -->
+    <record id="view_ajuste_bitacora_list" model="ir.ui.view">
+        <field name="name">surtidora.ajuste.bitacora.list</field>
+        <field name="model">surtidora.ajuste.bitacora</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false"
+                  decoration-danger="diferencia &lt; 0">
+                <field name="create_date" string="Fecha"/>
+                <field name="product_id"/>
+                <field name="location_id" optional="show"/>
+                <field name="cantidad_sistema" optional="hide"/>
+                <field name="cantidad_contada" optional="hide"/>
+                <field name="diferencia" sum="Diferencia"/>
+                <field name="uom_id" optional="hide"/>
+                <field name="valor_diferencia" sum="Valor"/>
+                <field name="motivo_texto" string="Motivo"/>
+                <field name="nota" optional="hide"/>
+                <field name="solicitante_id"/>
+                <field name="autorizador_id"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ajuste_bitacora_search" model="ir.ui.view">
+        <field name="name">surtidora.ajuste.bitacora.search</field>
+        <field name="model">surtidora.ajuste.bitacora</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="product_id"/>
+                <field name="motivo_id"/>
+                <field name="solicitante_id"/>
+                <field name="autorizador_id"/>
+                <filter string="Bajas (faltantes)" name="bajas"
+                        domain="[('diferencia', '&lt;', 0)]"/>
+                <filter string="Altas (sobrantes)" name="altas"
+                        domain="[('diferencia', '&gt;', 0)]"/>
+                <separator/>
+                <filter string="Este mes" name="mes"
+                        domain="[('create_date', '&gt;=', (context_today().replace(day=1)).strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter string="Motivo" name="por_motivo"
+                            domain="[]" context="{'group_by': 'motivo_id'}"/>
+                    <filter string="Producto" name="por_producto"
+                            domain="[]" context="{'group_by': 'product_id'}"/>
+                    <filter string="Quién ajustó" name="por_usuario"
+                            domain="[]" context="{'group_by': 'solicitante_id'}"/>
+                    <filter string="Quién autorizó" name="por_autorizador"
+                            domain="[]" context="{'group_by': 'autorizador_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ajuste_bitacora" model="ir.actions.act_window">
+        <field name="name">Bitácora de ajustes</field>
+        <field name="res_model">surtidora.ajuste.bitacora</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Todavía no hay ajustes registrados</p>
+            <p>Cada ajuste de inventario queda aquí con su motivo, quién lo
+               hizo y quién lo autorizó. Este registro no se puede editar
+               ni borrar.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_ajuste_bitacora"
+              name="Bitácora de ajustes"
+              parent="stock.menu_stock_config_settings"
+              action="action_ajuste_bitacora"
+              groups="stock.group_stock_manager"
+              sequence="90"/>
+
+    <menuitem id="menu_motivo_ajuste"
+              name="Motivos de ajuste"
+              parent="stock.menu_stock_config_settings"
+              action="action_motivo_ajuste"
+              groups="stock.group_stock_manager"
+              sequence="90"/>
+</odoo>

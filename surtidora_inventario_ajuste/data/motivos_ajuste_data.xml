@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- ADG solo tiene dos tipos ("AJUSTE DE INVENTARIO" y "AJUSTE INICIAL")
+         y el campo de concepto viene vacío en 295 de los últimos 300
+         ajustes: no hay un catálogo real que copiar. Estos son los motivos
+         habituales de una distribuidora; el listado definitivo lo confirma
+         Surtidora. Editables y archivables. -->
+    <record id="motivo_conteo_fisico" model="surtidora.motivo.ajuste">
+        <field name="name">Conteo físico</field>
+        <field name="nota">Diferencia encontrada al contar el almacén</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="motivo_vencida" model="surtidora.motivo.ajuste">
+        <field name="name">Mercancía vencida</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="motivo_averia" model="surtidora.motivo.ajuste">
+        <field name="name">Avería / rotura</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="motivo_merma" model="surtidora.motivo.ajuste">
+        <field name="name">Merma</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="motivo_faltante" model="surtidora.motivo.ajuste">
+        <field name="name">Faltante</field>
+        <field name="nota">Mercancía que no aparece — requiere revisión</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="motivo_sobrante" model="surtidora.motivo.ajuste">
+        <field name="name">Sobrante encontrado</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="motivo_error_digitacion" model="surtidora.motivo.ajuste">
+        <field name="name">Error de digitación</field>
+        <field name="nota">Se facturó o recibió mal y hay que corregir</field>
+        <field name="sequence">70</field>
+    </record>
+    <record id="motivo_muestra" model="surtidora.motivo.ajuste">
+        <field name="name">Muestra / degustación</field>
+        <field name="sequence">80</field>
+    </record>
+    <record id="motivo_donacion" model="surtidora.motivo.ajuste">
+        <field name="name">Donación</field>
+        <field name="sequence">90</field>
+    </record>
+    <record id="motivo_carga_inicial" model="surtidora.motivo.ajuste">
+        <field name="name">Carga inicial</field>
+        <field name="nota">Existencia de arranque del sistema</field>
+        <field name="sequence">100</field>
+    </record>
+</odoo>
