@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_reporte_cuadre" model="ir.actions.report">
+        <field name="name">Cuadre de Caja</field>
+        <field name="model">pos.session</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">surtidora_cuadre.reporte_cuadre</field>
+        <field name="report_file">surtidora_cuadre.reporte_cuadre</field>
+        <field name="binding_model_id" ref="point_of_sale.model_pos_session"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Cuadre - %s' % (object.name)</field>
+    </record>
+
+    <template id="reporte_cuadre">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <t t-set="d" t-value="o.surtidora_datos_cuadre()"/>
+                    <t t-set="moneda" t-value="o.currency_id"/>
+                    <div class="page">
+                        <h2 class="text-center">CUADRE DE CAJA</h2>
+                        <h4 class="text-center text-muted" t-esc="d['cuadre']"/>
+                        <p t-if="not d['contado_hecho']" class="text-center fw-bold text-danger">
+                            SESIÓN ABIERTA — CUADRE PARCIAL, EFECTIVO SIN CONTAR
+                        </p>
+                        <p t-elif="not d['cerrada']" class="text-center fw-bold text-danger">
+                            CIERRE SIN TERMINAR — efectivo ya contado
+                        </p>
+
+                        <table class="table table-sm table-borderless mt-3" style="width: 100%;">
+                            <tr>
+                                <td style="width: 50%;"><strong>Caja:</strong> <span t-esc="d['caja']"/></td>
+                                <td><strong>Abrió la caja:</strong> <span t-esc="d['abrio']"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Apertura:</strong> <span t-esc="d['apertura']" t-options='{"widget": "datetime"}'/></td>
+                                <td><strong>Cierre:</strong> <span t-esc="d['cierre']" t-options='{"widget": "datetime"}'/></td>
+                            </tr>
+                        </table>
+
+                        <!-- Una sesión la pueden operar varias cajeras: la hoja
+                             debe nombrarlas a todas, no solo a quien abrió. -->
+                        <t t-if="len(d['cajeros']) &gt; 1">
+                            <h5 class="mt-3">Cajeros que cobraron</h5>
+                            <table class="table table-sm">
+                                <thead><tr><th>Cajero</th><th class="text-end">Órdenes</th>
+                                    <th class="text-end">Monto</th></tr></thead>
+                                <tbody>
+                                    <tr t-foreach="d['cajeros']" t-as="c">
+                                        <td t-esc="c['nombre']"/>
+                                        <td class="text-end" t-esc="c['ordenes']"/>
+                                        <td class="text-end" t-out="c['monto']"
+                                            t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <h5 class="mt-3">Resumen por forma de pago</h5>
+                        <table class="table table-sm">
+                            <thead><tr><th>Método</th><th class="text-end">Calculado</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="d['metodos']" t-as="m">
+                                    <td t-esc="m['nombre']"/>
+                                    <td class="text-end" t-out="m['monto']"
+                                        t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                </tr>
+                                <tr class="fw-bold">
+                                    <td>Total ventas (<t t-esc="d['num_ordenes']"/> órdenes)</td>
+                                    <td class="text-end" t-out="d['total_ventas']"
+                                        t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 class="mt-3">Efectivo</h5>
+                        <table class="table table-sm">
+                            <tr><td>Fondo de apertura</td>
+                                <td class="text-end" t-out="d['fondo']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
+                            <tr><td>Ventas en efectivo</td>
+                                <td class="text-end" t-out="d['ventas_efectivo']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
+                            <tr><td>Entradas de caja</td>
+                                <td class="text-end" t-out="d['entradas']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
+                            <tr><td>Salidas de caja</td>
+                                <td class="text-end" t-out="-d['salidas']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
+                            <tr class="fw-bold"><td>Efectivo esperado</td>
+                                <td class="text-end" t-out="d['esperado']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
+                            <!-- Con la sesión abierta el contado vale 0 y la
+                                 diferencia sería -esperado: un "faltante" en
+                                 rojo que nadie tiene todavía. -->
+                            <t t-if="d['contado_hecho']">
+                                <tr class="fw-bold"><td>Efectivo contado</td>
+                                    <td class="text-end" t-out="d['contado']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
+                                <tr t-att-class="'fw-bold ' + ('text-success' if d['cuadrado'] else 'text-danger')">
+                                    <td>DIFERENCIA
+                                        <t t-if="d['cuadrado']">— CUADRADO</t>
+                                        <t t-elif="d['faltante']">— FALTANTE</t>
+                                        <t t-else="">— SOBRANTE</t>
+                                    </td>
+                                    <td class="text-end" t-out="d['diferencia']"
+                                        t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                </tr>
+                            </t>
+                            <t t-else="">
+                                <tr class="fw-bold"><td>Efectivo contado</td>
+                                    <td class="text-end">pendiente del cierre</td></tr>
+                                <tr class="fw-bold"><td>DIFERENCIA</td>
+                                    <td class="text-end">pendiente del cierre</td></tr>
+                            </t>
+                        </table>
+
+                        <t t-if="d['arqueo']">
+                            <h5 class="mt-3">Arqueo por denominación</h5>
+                            <table class="table table-sm">
+                                <thead><tr><th class="text-end">Denominación</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th class="text-end">Subtotal</th></tr></thead>
+                                <tbody>
+                                    <tr t-foreach="d['arqueo']" t-as="fila">
+                                        <td class="text-end" t-out="fila['denominacion']"
+                                            t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                        <td class="text-end" t-esc="fila['cantidad']"/>
+                                        <td class="text-end" t-out="fila['subtotal']"
+                                            t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                    </tr>
+                                    <tr class="fw-bold">
+                                        <td colspan="2">Total contado en billetes</td>
+                                        <td class="text-end" t-out="d['total_arqueo']"
+                                            t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p t-if="d['arqueo_descuadrado']" class="text-danger fw-bold">
+                                El desglose de billetes no coincide con el efectivo contado —
+                                verifique el conteo antes de firmar.
+                            </p>
+                        </t>
+
+                        <t t-if="d['movimientos']">
+                            <h5 class="mt-3">Entradas y salidas de caja</h5>
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr t-foreach="d['movimientos']" t-as="mov">
+                                        <td t-esc="mov['concepto']"/>
+                                        <td class="text-end" t-out="mov['monto']"
+                                            t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <t t-if="d['num_devoluciones']">
+                            <h5 class="mt-3">Devoluciones (<t t-esc="d['num_devoluciones']"/>)</h5>
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr t-foreach="d['devol_por_motivo']" t-as="dev">
+                                        <td t-esc="dev['motivo']"/>
+                                        <td class="text-end" t-esc="dev['cantidad']"/>
+                                        <td class="text-end" t-out="dev['monto']"
+                                            t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                    </tr>
+                                    <tr class="fw-bold">
+                                        <td colspan="2">Total devoluciones</td>
+                                        <td class="text-end" t-out="d['monto_devoluciones']"
+                                            t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <table class="table table-borderless mt-5" style="width: 100%;">
+                            <tr>
+                                <td class="text-center" style="width: 50%;">
+                                    ______________________________<br/>
+                                    Entregado por (Cajero)
+                                </td>
+                                <td class="text-center">
+                                    ______________________________<br/>
+                                    Revisado por (Supervisor)
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
