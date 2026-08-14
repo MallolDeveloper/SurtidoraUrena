@@ -58,7 +58,8 @@ patch(ProductScreen.prototype, {
                 id: ++id,
                 label: `${uom.name} (${factor} ${nombreBase}) — ${fmt(tarifaCaja * factor)}`,
                 surti: this._argumentoEmpaque(precioBase, tarifaCaja, nombreBase, factor),
-                item: { qty: factor },
+                // `uom`: para presentar la línea como "1 Caja" (REQ-V16)
+                item: { qty: factor, uom },
             });
             if (productTemplate.surtidora_caja_fraccionable) {
                 for (const { f, txt } of FRACCIONES) {
@@ -71,7 +72,7 @@ patch(ProductScreen.prototype, {
                         label: `${txt} ${uom.name} (${qty} ${
                             productTemplate.uom_id?.name || _t("und")
                         }) — ${fmt(tarifaCaja * qty)}`,
-                        item: { qty, price: tarifaCaja },
+                        item: { qty, price: tarifaCaja, uom },
                     });
                 }
             }
@@ -117,6 +118,10 @@ patch(ProductScreen.prototype, {
                     vals.price_unit = seleccion.price;
                     vals.price_type = "manual"; // tarifa caja: no recalcular a precio suelto
                 }
+                if (seleccion.uom) {
+                    // recuerda el empaque para presentarlo en el recibo (REQ-V16)
+                    vals.surtidora_uom_venta_id = seleccion.uom;
+                }
                 await this.pos.addLineToCurrentOrder(vals, {});
                 this.showOptionalProductPopupIfNeeded(product);
                 return;
@@ -134,6 +139,8 @@ patch(ProductScreen.prototype, {
                     product_id: empaque.product_id,
                     product_tmpl_id: empaque.product_id.product_tmpl_id,
                     qty: factor,
+                    // el escaneo del empaque también se presenta como "1 Caja"
+                    surtidora_uom_venta_id: empaque.uom_id,
                 },
                 { code },
                 empaque.product_id.needToConfigure()
