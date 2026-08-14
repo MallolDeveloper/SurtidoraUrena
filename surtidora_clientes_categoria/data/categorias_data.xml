@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- El vocabulario REAL de Surtidora, medido en la base de ADG: 2,180
+         clientes traen paréntesis pero con 645 textos distintos (mezcla de
+         categorías con nombres de dueños y apodos). Estas 10 cubren ~900
+         clientes; el resto se deja intacto a propósito.
+         Adelso confirma la lista — es su vocabulario, no el nuestro. -->
+    <record id="categoria_chuchero" model="res.partner.category">
+        <field name="name">Chuchero</field>
+        <field name="surtidora_variantes">CHUCHERO, CHUCHERA, CHUCHERIA, CHUCHERO_</field>
+        <field name="color">4</field>
+    </record>
+    <record id="categoria_haiti" model="res.partner.category">
+        <field name="name">Haití</field>
+        <field name="surtidora_variantes">HAITI</field>
+        <field name="color">1</field>
+    </record>
+    <record id="categoria_colmado" model="res.partner.category">
+        <field name="name">Colmado</field>
+        <field name="surtidora_variantes">COLMADO, COLMADERO</field>
+        <field name="color">3</field>
+    </record>
+    <record id="categoria_cafeteria" model="res.partner.category">
+        <field name="name">Cafetería</field>
+        <field name="surtidora_variantes">CAFETERIA</field>
+        <field name="color">5</field>
+    </record>
+    <record id="categoria_paletera" model="res.partner.category">
+        <field name="name">Paletera</field>
+        <field name="surtidora_variantes">PALETERA, PALETA</field>
+        <field name="color">6</field>
+    </record>
+    <record id="categoria_parafina" model="res.partner.category">
+        <field name="name">Parafina</field>
+        <field name="surtidora_variantes">PARAFINA, COMPRA PARAFINA</field>
+        <field name="color">7</field>
+    </record>
+    <record id="categoria_comedor" model="res.partner.category">
+        <field name="name">Comedor</field>
+        <field name="surtidora_variantes">COMEDOR</field>
+        <field name="color">8</field>
+    </record>
+    <record id="categoria_ama_casa" model="res.partner.category">
+        <field name="name">Ama de casa</field>
+        <field name="surtidora_variantes">AMA DE CASA</field>
+        <field name="color">9</field>
+    </record>
+    <record id="categoria_surtidora" model="res.partner.category">
+        <field name="name">Surtidora</field>
+        <field name="surtidora_variantes">SURTIDORA</field>
+        <field name="color">10</field>
+    </record>
+    <record id="categoria_variedades" model="res.partner.category">
+        <field name="name">Variedades</field>
+        <field name="surtidora_variantes">VARIEDADES</field>
+        <field name="color">11</field>
+    </record>
+</odoo>
