@@ -11,6 +11,8 @@ class AutorizarPrecioWizard(models.TransientModel):
 
     order_id = fields.Many2one('sale.order', required=True, ondelete='cascade')
     linea_ids = fields.One2many('surtidora.autorizar.precio.linea', 'wizard_id')
+    # NO required a nivel de campo: hay que poder vaciarlo. Lo exige la
+    # vista, y el código valida que venga.
     pin = fields.Char(string='PIN del supervisor')
     motivo_id = fields.Many2one(
         'surtidora.motivo.descuento', string='Motivo', required=True)
@@ -28,11 +30,28 @@ class AutorizarPrecioWizard(models.TransientModel):
             }) for line in order._lineas_pendientes()]
         return vals
 
+    def _borrar_pin(self):
+        """Borra el PIN en una transacción APARTE.
+
+        El asistente guarda el PIN en su tabla para poder enviarlo, y quien
+        puede leerlo después es justo el vendedor al que se controla (los
+        registros del asistente pertenecen a quien los crea). Borrarlo con
+        un write normal no sirve: si después se rechaza el PIN, el rollback
+        lo devuelve a su sitio. Por eso va con cursor propio, que confirma
+        solo (probado: sin esto el PIN quedaba guardado)."""
+        if not self.id:
+            return
+        with self.pool.cursor() as cr:
+            cr.execute('UPDATE surtidora_autorizar_precio_wizard '
+                       'SET pin = NULL WHERE id = %s', (self.id,))
+
     def action_autorizar(self):
         self.ensure_one()
-        if not self.pin:
+        pin = (self.pin or '').strip()
+        self._borrar_pin()
+        if not pin:
             raise UserError(_('Teclee el PIN del supervisor.'))
-        autorizador = self.env['res.users']._surtidora_verificar_pin(self.pin)
+        autorizador = self.env['res.users']._surtidora_verificar_pin(pin)
         if not autorizador:
             raise UserError(_('PIN incorrecto o el usuario no es autorizador de precios.'))
 
