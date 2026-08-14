@@ -15,7 +15,7 @@
                     <field name="quant_ids" invisible="1"/>
                     <field name="motivo_id" options="{'no_create': True}"/>
                     <field name="nota" placeholder="Detalle para la bitácora"/>
-                    <field name="pin" password="True"/>
+                    <field name="pin" password="True" required="1"/>
                 </group>
                 <separator string="Lo que se va a ajustar"/>
                 <field name="resumen" nolabel="1" readonly="1"/>

@@ -21,7 +21,9 @@ class AjusteAutorizacion(models.TransientModel):
     motivo_id = fields.Many2one('surtidora.motivo.ajuste', string='Motivo',
                                 required=True)
     nota = fields.Char(string='Nota', help='Detalle libre para la bitácora.')
-    pin = fields.Char(string='Clave del supervisor', required=True)
+    # NO required a nivel de campo: hay que poder vaciarlo. Lo exige la
+    # vista, y el código valida que venga.
+    pin = fields.Char(string='Clave del supervisor')
     resumen = fields.Text(string='Resumen', readonly=True,
                           compute='_compute_resumen')
 
@@ -65,13 +67,27 @@ class AjusteAutorizacion(models.TransientModel):
     def _num(valor):
         return '{:,.2f}'.format(valor or 0.0)
 
+    def _borrar_pin(self):
+        """Borra la clave en una transacción APARTE.
+
+        El asistente guarda el PIN en su tabla para poder enviarlo, y quien
+        puede leerlo después es justo el encargado al que se controla (los
+        registros del asistente pertenecen a quien los crea). Borrarlo con
+        un write normal no sirve: si después se rechaza la clave, el
+        rollback lo devuelve a su sitio. Por eso va con cursor propio, que
+        confirma solo (probado: sin esto el PIN quedaba guardado)."""
+        if not self.id:
+            return
+        with self.pool.cursor() as cr:
+            cr.execute('UPDATE surtidora_ajuste_autorizacion SET pin = NULL '
+                       'WHERE id = %s', (self.id,))
+
     def action_confirmar(self):
         self.ensure_one()
         pin = (self.pin or '').strip()
-        # el PIN se borra ANTES que nada: el asistente lo guarda en su tabla
-        # para poder enviarlo, y quien lo puede leer después es justo el
-        # encargado al que se está controlando
-        self.sudo().write({'pin': False})
+        self._borrar_pin()
+        if not pin:
+            raise UserError(_('Escriba la clave del supervisor.'))
 
         quants = self.quant_ids.filtered(lambda q: not float_is_zero(
             q.inventory_quantity - q.quantity,
