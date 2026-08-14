@@ -33,6 +33,12 @@ class ExtraerCategoria(models.TransientModel):
     def _candidatos(self):
         """(partner, categoría, nombre limpio) de lo que SÍ se reconoce."""
         categorias = self.env['res.partner.category'].search([])
+        # las configuradas (con variantes) van primero: si existe una
+        # etiqueta duplicada del mismo nombre —pasa cuando la migración ya
+        # creó etiquetas sueltas— gana la que este módulo mantiene, y no
+        # la que quedó primera por número
+        categorias = categorias.sorted(
+            key=lambda c: (not c.surtidora_variantes, c.id))
         indice = {}
         for categoria in categorias:
             for variante in categoria._surtidora_variantes_lista():
@@ -56,6 +62,17 @@ class ExtraerCategoria(models.TransientModel):
                 filas.append((partner, encontradas, limpio or nombre))
         return filas
 
+    def _duplicadas(self):
+        """Nombres de etiqueta que existen más de una vez."""
+        from ..models.categoria import normalizar as _n
+        vistas, repetidas = {}, set()
+        for categoria in self.env['res.partner.category'].search([]):
+            clave = _n(categoria.name)
+            if clave in vistas:
+                repetidas.add(categoria.name)
+            vistas[clave] = categoria
+        return sorted(repetidas)
+
     def action_vista_previa(self):
         self.ensure_one()
         filas = self._candidatos()
@@ -72,7 +89,14 @@ class ExtraerCategoria(models.TransientModel):
                 muestras.append('%s  →  %s  [%s]' % (
                     partner.name, limpio if self.aplicar_nombre else partner.name,
                     ', '.join(c.name for c in categorias)))
-        lineas = [_('Se van a etiquetar %s clientes:') % len(filas), '']
+        lineas = []
+        duplicadas = self._duplicadas()
+        if duplicadas:
+            lineas += [_('AVISO: hay etiquetas repetidas con el mismo nombre '
+                         '(%s). Se usará la configurada aquí, pero conviene '
+                         'unificarlas para que los filtros no dejen clientes '
+                         'fuera.') % ', '.join(duplicadas), '']
+        lineas += [_('Se van a etiquetar %s clientes:') % len(filas), '']
         lineas += ['   %s: %s' % (n, c) for n, c in sorted(
             conteo.items(), key=lambda x: -x[1])]
         lineas += ['', _('Ejemplos:'), '']
