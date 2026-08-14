@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- El motivo en el formulario de la orden. Solo el encargado del POS
+         puede corregirlo (misclick de la cajera entre motivos vecinos);
+         para el resto es solo lectura. Al encargado se le muestra también
+         vacío en órdenes con total negativo: así puede completar el motivo
+         de una devolución que se escapó sin él (backend, histórico). -->
+    <record id="view_pos_pos_form_motivo" model="ir.ui.view">
+        <field name="name">pos.order.form.motivo.devolucion</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="surtidora_motivo_dev_id" readonly="1"
+                       invisible="not surtidora_motivo_dev_id"
+                       groups="!point_of_sale.group_pos_manager"/>
+                <field name="surtidora_motivo_dev_id"
+                       invisible="not surtidora_motivo_dev_id and amount_total &gt;= 0"
+                       groups="point_of_sale.group_pos_manager"/>
+            </field>
+            <!-- La devolución desde el backend no pasa por el candado del
+                 POS (es JS): se restringe al encargado; si la usa, la
+                 devolución aparece en "Devoluciones sin motivo" y puede
+                 completar el motivo aquí mismo. -->
+            <button name="refund" position="attributes">
+                <attribute name="groups">point_of_sale.group_pos_manager</attribute>
+            </button>
+        </field>
+    </record>
+
+    <!-- Filtros: "Devoluciones" por lo que la orden ES (total negativo o
+         líneas de reembolso), no por tener motivo — si filtrara por motivo,
+         ocultaría justo las devoluciones que se escaparon sin él. -->
+    <record id="view_pos_order_filter_motivo" model="ir.ui.view">
+        <field name="name">pos.order.search.motivo.devolucion</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_order_filter"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="surtidora_motivo_dev_id"/>
+            </field>
+            <search position="inside">
+                <filter string="Devoluciones" name="devoluciones"
+                        domain="['|', ('amount_total', '&lt;', 0), ('lines.refunded_orderline_id', '!=', False)]"/>
+                <filter string="Devoluciones sin motivo" name="devoluciones_sin_motivo"
+                        domain="['&amp;', ('surtidora_motivo_dev_id', '=', False), '|', ('amount_total', '&lt;', 0), ('lines.refunded_orderline_id', '!=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter string="Motivo de devolución" name="por_motivo_dev"
+                            context="{'group_by': 'surtidora_motivo_dev_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+</odoo>

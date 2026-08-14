@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Catálogo real de ADG (sis_tipos_devoluciones), ordenado por frecuencia
+         de uso de los últimos 12 meses. Los 7 motivos por persona "Fulana se
+         equivocó al digitar" colapsan en "Error de digitación": la orden de
+         Odoo ya registra quién la digitó. Editables y archivables. -->
+    <record id="motivo_falta_existencia" model="surtidora.motivo.devolucion">
+        <field name="name">Falta de existencia</field>
+        <field name="nota">Se facturó mercancía que no había en inventario</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="motivo_cambio_producto" model="surtidora.motivo.devolucion">
+        <field name="name">Cambio de producto</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="motivo_error_digitacion" model="surtidora.motivo.devolucion">
+        <field name="name">Error de digitación</field>
+        <field name="nota">Se digitó mal la factura (quién lo hizo queda en la orden)</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="motivo_error_vendedor" model="surtidora.motivo.devolucion">
+        <field name="name">Error del vendedor</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="motivo_cliente_general" model="surtidora.motivo.devolucion">
+        <field name="name">Devolución de cliente general</field>
+        <field name="nota">Devolución que no cae en un motivo registrado</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="motivo_pedido_rechazado" model="surtidora.motivo.devolucion">
+        <field name="name">Pedido rechazado por el cliente</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="motivo_error_facturacion" model="surtidora.motivo.devolucion">
+        <field name="name">Error de facturación</field>
+        <field name="sequence">70</field>
+    </record>
+    <record id="motivo_cliente_solicito_error" model="surtidora.motivo.devolucion">
+        <field name="name">Cliente lo solicitó por error</field>
+        <field name="sequence">80</field>
+    </record>
+    <record id="motivo_decision_administrativa" model="surtidora.motivo.devolucion">
+        <field name="name">Decisión administrativa</field>
+        <field name="sequence">90</field>
+    </record>
+    <record id="motivo_cambio_danada" model="surtidora.motivo.devolucion">
+        <field name="name">Cambio de mercancía dañada</field>
+        <field name="sequence">100</field>
+    </record>
+    <record id="motivo_no_despachada" model="surtidora.motivo.devolucion">
+        <field name="name">No despachada</field>
+        <field name="sequence">110</field>
+    </record>
+    <record id="motivo_producto_danado" model="surtidora.motivo.devolucion">
+        <field name="name">Producto dañado</field>
+        <field name="sequence">120</field>
+    </record>
+    <record id="motivo_despacho_error" model="surtidora.motivo.devolucion">
+        <field name="name">Despacho por error</field>
+        <field name="sequence">130</field>
+    </record>
+    <record id="motivo_malas_condiciones" model="surtidora.motivo.devolucion">
+        <field name="name">Devolución en malas condiciones</field>
+        <field name="nota">Según el cliente la mercancía llegó en mala condición</field>
+        <field name="sequence">140</field>
+    </record>
+    <record id="motivo_vencimiento" model="surtidora.motivo.devolucion">
+        <field name="name">Devolución por fecha de vencimiento</field>
+        <field name="nota">Según el cliente se le entregó vencida</field>
+        <field name="sequence">150</field>
+    </record>
+    <record id="motivo_rotura" model="surtidora.motivo.devolucion">
+        <field name="name">Rotura</field>
+        <field name="sequence">160</field>
+    </record>
+    <record id="motivo_sin_rotacion" model="surtidora.motivo.devolucion">
+        <field name="name">No tuvo rotación</field>
+        <field name="sequence">170</field>
+    </record>
+</odoo>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_motivo_devolucion_list" model="ir.ui.view">
+        <field name="name">surtidora.motivo.devolucion.list</field>
+        <field name="model">surtidora.motivo.devolucion</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="nota" optional="show"/>
+                <field name="active" widget="boolean_toggle" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_motivo_devolucion_search" model="ir.ui.view">
+        <field name="name">surtidora.motivo.devolucion.search</field>
+        <field name="model">surtidora.motivo.devolucion</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter string="Archivados" name="inactive"
+                        domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_motivo_devolucion" model="ir.actions.act_window">
+        <field name="name">Motivos de devolución</field>
+        <field name="res_model">surtidora.motivo.devolucion</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Registre los motivos de devolución</p>
+            <p>La cajera elige uno de esta lista en cada devolución del mostrador.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_motivo_devolucion"
+              name="Motivos de devolución"
+              parent="point_of_sale.menu_point_config_product"
+              action="action_motivo_devolucion"
+              groups="point_of_sale.group_pos_manager"
+              sequence="60"/>
+</odoo>

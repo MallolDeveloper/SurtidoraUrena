@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <!-- El motivo impreso en el recibo de la devolución (evidencia para el
+         cliente y para el cuadre, como la tirilla de devolución de ADG). -->
+    <t t-name="surtidora_pos_devoluciones.OrderReceipt"
+       t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+        <xpath expr="//ReceiptHeader" position="after">
+            <div t-if="order.surtidora_motivo_dev_id"
+                 class="pos-receipt-devolucion text-center fw-bolder pt-2">
+                DEVOLUCION
+                <br/>
+                Motivo: <t t-esc="order.surtidora_motivo_dev_id.name"/>
+            </div>
+        </xpath>
+    </t>
+</templates>
