@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_alta_pantalla" model="ir.actions.client">
+        <field name="name">Alta de Producto</field>
+        <field name="tag">surtidora_producto_alta.pantalla</field>
+    </record>
+
+    <!-- El motor re-verifica el grupo en el servidor -->
+    <menuitem id="menu_alta_producto"
+              name="Alta de Producto (Surtidora)"
+              parent="stock.menu_stock_inventory_control"
+              action="action_alta_pantalla"
+              groups="stock.group_stock_manager"
+              sequence="15"/>
+</odoo>
