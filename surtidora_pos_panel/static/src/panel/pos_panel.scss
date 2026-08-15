@@ -1,32 +1,49 @@
+// Los tamaños del panel viven TODOS aquí: el mostrador se lee de pie, de lejos
+// y a la carrera, así que se ajustan en un solo lugar sin tocar la plantilla.
+// Al agrandar la letra hay que agrandar el ancho a la par: si no, la primera
+// columna se recorta más ("Caja de 15 (Paquet…") y se lee peor que antes.
+$surti-panel-ancho: 320px;
+$surti-panel-texto: 14px;
+$surti-panel-titulo: 16px;
+$surti-panel-seccion: 12px;
+$surti-panel-col1: 150px;
+
 .surti-pos-panel {
-    width: 260px;
+    width: $surti-panel-ancho;
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: $surti-panel-texto;
 
     .surti-pos-titulo {
-        font-size: 13px;
-        line-height: 1.2;
+        font-size: $surti-panel-titulo;
+        line-height: 1.25;
     }
     .surti-pos-seccion {
-        margin-top: 10px;
-        margin-bottom: 3px;
+        margin-top: 12px;
+        margin-bottom: 4px;
         font-weight: 700;
         text-transform: uppercase;
-        font-size: 10.5px;
-        opacity: 0.65;
+        font-size: $surti-panel-seccion;
+        opacity: 0.7;
     }
     .surti-pos-tabla {
         width: 100%;
+        line-height: 1.35;
         td {
-            padding: 2px 3px;
+            padding: 4px 4px;
             border-bottom: 1px solid rgba(128, 128, 128, 0.15);
             white-space: nowrap;
         }
         td:first-child {
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 110px;
+            max-width: $surti-panel-col1;
             white-space: nowrap;
+        }
+        // el equivalente "(176.67 c/u)" es dato de apoyo: va un punto más
+        // chico para que la fila quepa sin recortar el precio, que es el dato
+        // que se consulta de verdad
+        .surti-pos-equiv {
+            font-size: 0.85em;
         }
     }
 }
@@ -35,8 +52,8 @@
 .surti-pos-balance {
     border: 1px solid #d9dde2;
     border-radius: 6px;
-    padding: 4px 8px 6px;
-    margin-bottom: 8px;
+    padding: 6px 10px 8px;
+    margin-bottom: 10px;
     background: #fff;
 
     &.surti-bal-rojo { border-color: #a4373a; background: #fdeced; }
