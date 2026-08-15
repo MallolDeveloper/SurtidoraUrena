@@ -35,7 +35,8 @@
                     <tr t-foreach="surtiPanel.datos.precios" t-as="p" t-key="p_index">
                         <td t-esc="p.unidad"/>
                         <td class="text-end fw-bolder" t-esc="surtiN(p.precio)"/>
-                        <td class="text-end text-muted" t-esc="'(' + surtiN(p.equivalente) + ' c/u)'"/>
+                        <td class="text-end text-muted surti-pos-equiv"
+                            t-esc="'(' + surtiN(p.equivalente) + ' c/u)'"/>
                     </tr>
                 </table>
 
