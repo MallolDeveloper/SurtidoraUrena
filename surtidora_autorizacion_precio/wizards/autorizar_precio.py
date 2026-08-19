@@ -94,9 +94,10 @@ class AutorizarPrecioLinea(models.TransientModel):
     # Lo que el cliente PAGA por unidad (precio menos descuento, con ITBIS),
     # no price_unit: el supervisor tiene que ver el número que va a autorizar.
     # Con price_unit veía 100.00 mientras la línea llevaba 99% de descuento.
-    # price_reduce_taxinc es Float en sale.order.line: el related debe coincidir.
-    precio_propuesto = fields.Float(
+    # price_reduce_taxinc es Monetary en sale.order.line (price_unit era Float):
+    # el tipo del related TIENE que coincidir o el registro no carga.
+    precio_propuesto = fields.Monetary(
         related='line_id.price_reduce_taxinc', string='Precio propuesto',
-        digits='Product Price')
+        currency_field='currency_id')
     currency_id = fields.Many2one(related='line_id.currency_id')
     bajo_costo = fields.Boolean(string='¡Bajo costo!', readonly=True)
