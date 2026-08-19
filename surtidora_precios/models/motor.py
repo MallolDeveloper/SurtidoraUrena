@@ -294,8 +294,13 @@ class PreciosMotor(models.AbstractModel):
         # que el filtro de arriba nunca las veía — y son justo las que ponen el
         # precio cuando la lista no tiene regla propia del producto. El aviso
         # daba 0 y hacía creer que aquí se veía todo.
+        # ojo: TODAS las tarifas de la compañía, no solo `_listas()` — esa
+        # deja fuera precisamente a las que solo tienen reglas de fórmula,
+        # que son las que suelen llevar las globales
+        tarifas = self.env['product.pricelist'].search(
+            [('company_id', 'in', [False, self.env.company.id])])
         extras += self.env['product.pricelist.item'].search_count([
-            ('pricelist_id', 'in', self._listas().ids),
+            ('pricelist_id', 'in', tarifas.ids),
             '|', ('applied_on', '=', '3_global'),
             '&', ('applied_on', '=', '2_product_category'),
             ('categ_id', 'parent_of', tmpl.categ_id.id),

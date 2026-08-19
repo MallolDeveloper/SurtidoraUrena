@@ -110,8 +110,8 @@ class PrecioSugerido(models.TransientModel):
             if datos['reglas_extra']:
                 avisos.append(_(
                     'Este producto tiene %s regla(s) de precio que esta ventana '
-                    'NO toca (variantes, promociones con fecha o cantidades '
-                    'fraccionadas). Se editan desde la lista de precios.')
+                    'NO toca (variantes o promociones con fecha). Se '
+                    'editan desde la lista de precios.')
                     % datos['reglas_extra'])
             wizard.aviso = '\n'.join(avisos)
 
