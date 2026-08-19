@@ -22,6 +22,14 @@
                                 string="Sugerir desde el costo" class="btn-secondary"/>
                     </group>
                 </group>
+                <group string="¿Falta un empaque?" col="4">
+                    <field name="empaque_nombre" nolabel="1" placeholder="Paquete"/>
+                    <field name="empaque_cantidad" nolabel="1"
+                           placeholder="trae cuántas unidades"/>
+                    <button name="action_agregar_empaque" type="object"
+                            string="Agregar empaque" class="btn-secondary"
+                            colspan="2"/>
+                </group>
                 <separator string="Precio por lista y unidad"/>
                 <field name="linea_ids" nolabel="1">
                     <list editable="bottom" create="false" delete="false">

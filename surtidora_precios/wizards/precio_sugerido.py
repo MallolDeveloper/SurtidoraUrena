@@ -66,6 +66,16 @@ class PrecioSugerido(models.TransientModel):
         string='Redondear a múltiplos de', default=5.0,
         help='El 98% de los precios de la casa son múltiplos de 5.')
     linea_ids = fields.One2many('surtidora.precio.sugerido.linea', 'wizard_id')
+    # Declarar un empaque desde aquí. La ventana solo puede mostrar las
+    # unidades que el producto YA tiene, así que en un producto nuevo no
+    # había ninguna fila donde poner el precio del paquete: había que salir
+    # a la ficha, crear la unidad de medida y volver. Se declara aquí, que
+    # es donde uno está pensando en «la unidad a 5 y el paquete de 25 a 100».
+    empaque_nombre = fields.Char(string='Empaque', default='Paquete')
+    empaque_cantidad = fields.Float(
+        string='Trae cuántas unidades', digits=(16, 4),
+        help='Cuántas unidades base entran en el empaque. Un paquete de 25 '
+             'unidades: 25.')
 
     @api.depends('product_tmpl_id')
     def _compute_cabecera(self):
@@ -310,6 +320,40 @@ class PrecioSugerido(models.TransientModel):
                        'type': 'success', 'sticky': bool(resultado.get('avisos')),
                        'next': {'type': 'ir.actions.act_window_close'}},
         }
+
+    def action_agregar_empaque(self):
+        """Le da al producto un empaque nuevo y vuelve con sus filas puestas.
+
+        Reutiliza la unidad de medida si ya existe una igual — hay 321 en el
+        sistema y 187 las comparten varios productos, así que lo normal es
+        reusar, no crear."""
+        self.ensure_one()
+        cantidad = self.empaque_cantidad or 0.0
+        if cantidad <= 1:
+            raise UserError(_(
+                'Diga cuántas unidades trae el empaque; tiene que ser más de '
+                'una. Un paquete de 25 unidades: 25.'))
+        tmpl = self.product_tmpl_id
+        base = tmpl.uom_id
+        nombre = '%s de %g (%s)' % (
+            (self.empaque_nombre or 'Paquete').strip(), cantidad, base.name)
+        Uom = self.env['uom.uom'].sudo()   # crear unidades pide «Products / Create»
+        uom = Uom.search([('relative_uom_id', '=', base.id),
+                          ('relative_factor', '=', cantidad),
+                          ('name', '=', nombre)], limit=1)
+        if not uom:
+            uom = Uom.create({'name': nombre, 'relative_uom_id': base.id,
+                              'relative_factor': cantidad})
+        if uom in tmpl.uom_ids:
+            raise UserError(_('El producto ya tiene el empaque «%s».') % nombre)
+        # sudo: escribir en product.template pide «Products / Create», que un
+        # Gerente de Ventas no tiene — _verificar_grupo ya dijo quién entra
+        tmpl.sudo().uom_ids = [(4, uom.id)]
+        return {'type': 'ir.actions.act_window', 'res_model': self._name,
+                'view_mode': 'form', 'target': 'new',
+                'context': dict(self.env.context,
+                                active_id=tmpl.id,
+                                active_model='product.template')}
 
     def _reabrir(self):
         return {'type': 'ir.actions.act_window', 'res_model': self._name,
