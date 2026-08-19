@@ -22,13 +22,24 @@
                                 string="Sugerir desde el costo" class="btn-secondary"/>
                     </group>
                 </group>
-                <group string="¿Falta un empaque?" col="4">
-                    <field name="empaque_nombre" nolabel="1" placeholder="Paquete"/>
-                    <field name="empaque_cantidad" nolabel="1"
-                           placeholder="trae cuántas unidades"/>
-                    <button name="action_agregar_empaque" type="object"
-                            string="Agregar empaque" class="btn-secondary"
-                            colspan="2"/>
+<separator string="¿Falta un empaque?"/>
+                <p class="text-muted">
+                    Abajo solo salen las unidades que el producto YA tiene. Si le
+                    falta una —«el paquete trae 25 unidades»— decláresela aquí y
+                    aparecerá en la tabla lista para ponerle precio.
+                </p>
+                <group>
+                    <group>
+                        <field name="empaque_nombre" string="Se llama"
+                               placeholder="Paquete, Caja, Fardo..."/>
+                        <field name="empaque_cantidad" string="Trae cuántas unidades"/>
+                    </group>
+                    <group>
+                        <button name="action_agregar_empaque" type="object"
+                                string="Agregar empaque a este producto"
+                                class="btn-secondary"
+                                invisible="empaque_cantidad &lt;= 1"/>
+                    </group>
                 </group>
                 <separator string="Precio por lista y unidad"/>
                 <field name="linea_ids" nolabel="1">

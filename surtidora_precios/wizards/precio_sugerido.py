@@ -73,7 +73,7 @@ class PrecioSugerido(models.TransientModel):
     # es donde uno está pensando en «la unidad a 5 y el paquete de 25 a 100».
     empaque_nombre = fields.Char(string='Empaque', default='Paquete')
     empaque_cantidad = fields.Float(
-        string='Trae cuántas unidades', digits=(16, 4),
+        string='Trae cuántas unidades', digits=(16, 2),
         help='Cuántas unidades base entran en el empaque. Un paquete de 25 '
              'unidades: 25.')
 
