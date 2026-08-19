@@ -266,10 +266,16 @@ patch(OrderPaymentValidation.prototype, {
         };
     },
 
+    /** Precio de tarifa de la línea, con SU cantidad.
+     *
+     * Preguntar siempre por cantidad 1 falseaba la rebaja en cuanto había
+     * reglas por volumen: una caja de 18 se comparaba contra el precio de un
+     * paquete suelto, y la bitácora registraba un descuento que no fue. El
+     * backend ya lo hace bien (pasa product_uom_qty a _get_product_price). */
     _surtiPrecioLista(linea) {
         try {
             const tmpl = linea.product_id.product_tmpl_id;
-            return tmpl.getPrice(this.order.pricelist_id, 1, 0);
+            return tmpl.getPrice(this.order.pricelist_id, Math.abs(linea.qty) || 1, 0);
         } catch {
             return 0;
         }
