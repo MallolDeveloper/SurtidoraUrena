@@ -121,6 +121,14 @@ class PrecioSugerido(models.TransientModel):
         """Del margen objetivo al precio, redondeado. Nunca por debajo del
         costo: RB-08 lo rechazaría al aplicar."""
         self.ensure_one()
+        # sin costo no hay margen que aplicar: antes el botón se quedaba
+        # callado y parecía averiado (típico en los combos, que no lo llevan)
+        if not any(l.costo_total for l in self.linea_ids):
+            raise UserError(_(
+                'El producto no tiene costo, así que no hay margen que '
+                'calcular. Ponga el costo en la pestaña «Compra» del producto '
+                'y vuelva a intentarlo; mientras tanto puede teclear los '
+                'precios a mano.'))
         paso = self.redondeo if self.redondeo > 0 else 0.01
         for linea in self.linea_ids:
             if not linea.costo_total:
