@@ -22,7 +22,7 @@ Esta pantalla replica ese flujo en una sola vista:
 Fórmula (deducida de 3,000 precios reales de ADG):
     precio = costo sin ITBIS × factor × (1 + ITBIS) × (1 + margen)
     """,
-    'version': '19.0.2.0.0',
+    'version': '19.0.2.0.1',
     'category': 'Sales/Sales',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
