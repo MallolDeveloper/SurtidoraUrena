@@ -26,6 +26,8 @@ Por eso aquí la línea GUARDA lo mínimo —la lista, la unidad y el precio
 tecleado— y todo lo demás lo CALCULA el servidor desde el producto. Y por
 si el navegador tampoco devuelve la lista y la unidad, `create` las repone
 por orden de fila. No queda nada que el cliente pueda perder."""
+import math
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -125,9 +127,12 @@ class PrecioSugerido(models.TransientModel):
                 continue
             bruto = linea.costo_total * (1 + self.margen_objetivo / 100.0)
             sugerido = round(bruto / paso) * paso
-            # el redondeo hacia abajo no puede meterlo bajo costo
-            while sugerido < linea.costo_total:
-                sugerido += paso
+            if sugerido < linea.costo_total:
+                # el redondeo hacia abajo no puede meterlo bajo costo. Se sube
+                # al múltiplo justo por encima del costo de una vez: subir de
+                # paso en paso podía dar millones de vueltas con un margen
+                # objetivo negativo y un redondeo fino.
+                sugerido = math.ceil(linea.costo_total / paso) * paso
             linea.precio_nuevo = sugerido
         return self._reabrir()
 

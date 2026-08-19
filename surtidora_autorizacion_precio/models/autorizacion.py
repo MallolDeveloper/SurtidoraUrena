@@ -41,10 +41,16 @@ class AutorizacionPrecio(models.Model):
 
     def sigue_vigente_para(self, line):
         """La autorización cubre la línea solo si producto, unidad y precio siguen
-        siendo los autorizados (si el precio vuelve a bajar, se re-autoriza)."""
+        siendo los autorizados (si el precio vuelve a bajar, se re-autoriza).
+
+        Se compara con price_reduce_taxinc —lo que el cliente paga por unidad,
+        con el descuento ya aplicado— y no con price_unit: si no, bastaba con
+        autorizar 90.00 y luego escribir 99% en la columna de descuento para
+        cobrar 0.90 amparado en la misma autorización."""
         self.ensure_one()
         return (
             self.product_id == line.product_id
             and self.uom_id == line.product_uom_id
-            and line.currency_id.compare_amounts(line.price_unit, self.precio_autorizado) >= 0
+            and line.currency_id.compare_amounts(
+                line.price_reduce_taxinc, self.precio_autorizado) >= 0
         )
