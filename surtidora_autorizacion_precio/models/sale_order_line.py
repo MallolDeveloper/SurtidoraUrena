@@ -100,13 +100,60 @@ class SaleOrderLine(models.Model):
             return False
         # price_reduce_taxexcl es price_subtotal/cantidad: con cantidad 0 da
         # 0.00 y marcaría bajo costo una línea que no vende nada
-        if not self.product_uom_qty:
+        if self.product_uom_qty <= 0:
+            # cantidad cero no vende nada; cantidad negativa es una devolución,
+            # y devolver por debajo del costo no es vender por debajo del costo
             return False
         # la cabecera del combo no cobra nada: el piso lo defienden sus hijas
         if self._es_cabecera_de_combo():
             return False
         return self.currency_id.compare_amounts(
             self.price_reduce_taxexcl, self._costo_en_uom()) < 0
+
+    # ------------------------------------------------------------------
+    # El candado no puede vivir SOLO en action_confirm
+    # ------------------------------------------------------------------
+    # Comprobado en la base: se confirma una orden a 120.00 (sin PIN, porque
+    # va por encima de lista) y acto seguido se le escribe 10.00 a la línea.
+    # Pasaba sin un solo bloqueo — 8.47 sin ITBIS contra un costo de 76.27.
+    # Y no era teórico: la orden S00012 tiene la línea en 45.00 mientras su
+    # autorización dice 50.00, editada hora y media DESPUÉS de confirmar.
+    #
+    # Las líneas siguen siendo editables con la orden en estado `sale`, así
+    # que las dos reglas se vuelven a comprobar al escribir. En borrador no
+    # hace falta: ahí manda action_confirm, y bloquear antes impediría armar
+    # la cotización.
+    _CAMPOS_QUE_MUEVEN_EL_DINERO = (
+        'price_unit', 'discount', 'product_uom_qty', 'product_uom_id', 'product_id')
+
+    def write(self, valores):
+        resultado = super().write(valores)
+        if any(c in valores for c in self._CAMPOS_QUE_MUEVEN_EL_DINERO):
+            self._revalidar_orden_confirmada()
+        return resultado
+
+    def _revalidar_orden_confirmada(self):
+        for linea in self:
+            if linea.order_id.state not in ('sale', 'done'):
+                continue
+            if (linea._es_bajo_costo()
+                    and not linea.company_id.surtidora_permitir_bajo_costo):
+                raise UserError(_(
+                    'No se puede dejar %(producto)s BAJO COSTO en una orden ya '
+                    'confirmada: precio %(precio).2f sin ITBIS contra un costo '
+                    'de %(costo).2f. RB-08 no admite excepciones.',
+                    producto=linea.product_id.display_name,
+                    precio=linea.price_reduce_taxexcl,
+                    costo=linea._costo_en_uom()))
+            if linea._requiere_autorizacion():
+                raise UserError(_(
+                    'La orden ya está confirmada y este cambio deja %(producto)s '
+                    'por debajo de la lista (%(precio).2f contra %(lista).2f) sin '
+                    'autorización que lo cubra. Use el botón «Autorizar precios»: '
+                    'un supervisor debe aprobarlo con su PIN.',
+                    producto=linea.product_id.display_name,
+                    precio=linea.price_reduce_taxinc,
+                    lista=linea._precio_de_lista()))
 
     def _requiere_autorizacion(self):
         """RB-01: ¿lo que el cliente paga está por debajo de la lista (menos la

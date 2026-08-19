@@ -71,6 +71,10 @@ class AutorizarPrecioWizard(models.TransientModel):
                 'cantidad': line.product_uom_qty,
                 'precio_lista': wl.precio_lista,
                 'precio_autorizado': line.price_reduce_taxinc,
+                # el costo del momento y el nombre del motivo, congelados:
+                # después no se pueden reconstruir
+                'costo': line._costo_en_uom(),
+                'motivo_texto': self.motivo_id.name or '',
                 'currency_id': line.currency_id.id,
                 'solicitante_id': self.env.user.id,
                 'autorizador_id': autorizador.id,

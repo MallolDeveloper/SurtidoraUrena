@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class AutorizacionPrecio(models.Model):
@@ -22,6 +23,14 @@ class AutorizacionPrecio(models.Model):
     cantidad = fields.Float(string='Cantidad')
     precio_lista = fields.Monetary(string='Precio de lista', currency_field='currency_id')
     precio_autorizado = fields.Monetary(string='Precio autorizado', currency_field='currency_id')
+    # El costo del MOMENTO. Sin esto la excepción de bajo costo no se puede
+    # medir después: standard_price cambia con cada compra, y dentro de seis
+    # meses nadie puede saber si aquella venta fue un 5% o un 40% bajo costo.
+    costo = fields.Monetary(
+        string='Costo al autorizar', currency_field='currency_id',
+        help='Costo del producto en el instante de autorizar, sin ITBIS. Se '
+             'calcula en el servidor: es lo que permite medir después cuánto '
+             'se dejó de ganar.')
     currency_id = fields.Many2one('res.currency', required=True)
     solicitante_id = fields.Many2one(
         'res.users', string='Solicitado por', required=True,
@@ -34,10 +43,35 @@ class AutorizacionPrecio(models.Model):
         'surtidora.motivo.descuento', string='Motivo', ondelete='restrict',
         help='Del catálogo de motivos (punto 6, reunión 7-ago): permite '
              'analizar qué motivos generan más descuentos.')
+    # Copia del NOMBRE del motivo, no solo el enlace: el catálogo es editable
+    # y renombrar «Vencimiento próximo» a «Promoción» reescribiría en silencio
+    # la razón de todas las rebajas pasadas. Mismo patrón que la bitácora de
+    # ajustes de inventario.
+    motivo_texto = fields.Char(string='Motivo (al autorizar)', readonly=True)
     nota = fields.Char(string='Nota')
     origen = fields.Selection(
         [('backend', 'Cotización'), ('pos', 'Mostrador (POS)')],
         default='backend', string='Origen')
+
+    # ------------------------------------------------------------------
+    # Una bitácora no se edita: es la prueba de quién autorizó qué
+    # ------------------------------------------------------------------
+    # El create=false/edit=false/delete=false de la vista es solo pantalla; el
+    # ACL daba escritura al Gerente de Ventas, que suele ser el jefe de quien
+    # pide las rebajas. Con exportar, cambiar el autorizador y reimportar,
+    # la bitácora quedaba alterada sin dejar huella.
+    def write(self, valores):
+        if not self.env.su:
+            raise UserError(_(
+                'La bitácora de autorizaciones no se modifica: es la prueba de '
+                'quién autorizó qué. Si un registro está mal, deje constancia '
+                'en la nota de una autorización nueva.'))
+        return super().write(valores)
+
+    def unlink(self):
+        if not self.env.su:
+            raise UserError(_('La bitácora de autorizaciones no se borra.'))
+        return super().unlink()
 
     def sigue_vigente_para(self, line):
         """La autorización cubre la línea solo si producto, unidad y precio siguen
@@ -53,4 +87,7 @@ class AutorizacionPrecio(models.Model):
             and self.uom_id == line.product_uom_id
             and line.currency_id.compare_amounts(
                 line.price_reduce_taxinc, self.precio_autorizado) >= 0
+            # y que no hayan SUBIDO la cantidad: el supervisor firmó una
+            # rebaja de N unidades, no de las que se le ocurran después
+            and line.product_uom_qty <= self.cantidad
         )

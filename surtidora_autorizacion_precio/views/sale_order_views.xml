@@ -9,7 +9,7 @@
                 <field name="requiere_autorizacion_precio" invisible="1"/>
                 <button name="action_abrir_autorizacion_precios" type="object"
                         string="Autorizar precios" class="btn-warning"
-                        invisible="not requiere_autorizacion_precio or state not in ('draft', 'sent')"
+                        invisible="not requiere_autorizacion_precio or state == 'cancel'"
                         help="Hay precios por debajo de la lista: un supervisor debe aprobarlos con su PIN."/>
             </xpath>
         </field>

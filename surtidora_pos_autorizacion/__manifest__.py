@@ -19,7 +19,7 @@ Punto 5 de la reunión con el cliente (7-ago-2026):
 La comparación es precio tecleado vs costo del producto (sin ITBIS), la misma
 regla RB-08 ya validada en el backend.
     """,
-    'version': '19.0.1.5.0',
+    'version': '19.0.1.6.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

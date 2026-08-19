@@ -37,12 +37,20 @@ class PosAutorizacion(models.AbstractModel):
             return {'ok': False, 'mensaje': str(bloqueo)}
         if not autorizador:
             return {'ok': False}
+        # El motivo se valida contra el catálogo: el navegador manda un id y
+        # nada garantizaba que existiera ni que fuera de este catálogo.
+        motivo = self.env['surtidora.motivo.descuento'].browse(
+            int(motivo_id) if motivo_id else 0).exists()
+        if not motivo:
+            return {'ok': False, 'mensaje': _('El motivo elegido ya no existe.')}
         Auditoria = self.env['surtidora.autorizacion.precio'].sudo()
         productos = self.env['product.product'].browse(
-            [int(l['product_id']) for l in lineas])
+            [int(l['product_id']) for l in lineas]).exists()
         por_id = {p.id: p for p in productos}
         for linea in lineas:
-            producto = por_id[int(linea['product_id'])]
+            producto = por_id.get(int(linea['product_id']))
+            if not producto:
+                continue
             Auditoria.create({
                 'company_id': self.env.company.id,
                 'order_ref': order_ref or '',
@@ -51,11 +59,16 @@ class PosAutorizacion(models.AbstractModel):
                 'cantidad': linea.get('cantidad', 0.0),
                 'precio_lista': linea.get('precio_lista', 0.0),
                 'precio_autorizado': linea['precio'],
+                # el COSTO lo pone el servidor, no el navegador: es el número
+                # con el que después se mide la gravedad de la excepción, y
+                # standard_price cambia con cada compra
+                'costo': producto.with_company(self.env.company).standard_price,
                 'currency_id': self.env.company.currency_id.id,
                 'solicitante_id': self.env.user.id,
                 'autorizador_id': autorizador.id,
                 'partner_id': int(partner_id) if partner_id else False,
-                'motivo_id': int(motivo_id) if motivo_id else False,
+                'motivo_id': motivo.id,
+                'motivo_texto': motivo.name or '',
                 'nota': nota or '',
                 'origen': 'pos',
             })

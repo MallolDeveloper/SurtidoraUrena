@@ -84,6 +84,14 @@ patch(PosOrderline.prototype, {
         if (this.combo_line_ids?.length) {
             return false;
         }
+        // Una DEVOLUCIÓN no es una venta bajo costo. La línea de reembolso
+        // lleva cantidad negativa y copia el precio de la venta original, así
+        // que si aquel artículo se remató con permiso —o si el costo subió
+        // desde entonces— devolverlo pedía otra vez motivo y PIN, y duplicaba
+        // la fila en la bitácora como si se hubiera vendido dos veces.
+        if (this.qty < 0 || this.refunded_orderline_id) {
+            return false;
+        }
         const costo = this.surtiCosto;
         return costo > 0 && this.surtiPrecioEfectivo < costo - 0.005;
     },
