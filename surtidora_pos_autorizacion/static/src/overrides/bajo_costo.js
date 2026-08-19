@@ -56,8 +56,18 @@ patch(PosOrderline.prototype, {
         return bruto / (1 + tasa / 100);
     },
 
-    /** ¿La línea está por debajo del costo? (pinta el rojo del template) */
+    /** ¿La línea está por debajo del costo? (pinta el rojo del template)
+     *
+     * La línea del producto combo es una CABECERA: Odoo la deja en 0.00 y
+     * reparte el dinero en las hijas, que sí llevan producto y costo reales
+     * y sí se revisan una por una. Medirla contra el costo bloquearía TODA
+     * venta de combo en cuanto alguien le ponga costo al combo — algo muy
+     * natural de hacer. `combo_line_ids` es como el propio Odoo distingue
+     * la cabecera. */
     get surtiBajoCosto() {
+        if (this.combo_line_ids?.length) {
+            return false;
+        }
         const costo = this.surtiCosto;
         return costo > 0 && this.surtiPrecioEfectivo < costo - 0.005;
     },
