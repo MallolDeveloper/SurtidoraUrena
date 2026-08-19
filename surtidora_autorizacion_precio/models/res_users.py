@@ -98,10 +98,15 @@ class ResUsers(models.Model):
                     'quién autorizó la rebaja.'))
 
     def _surtidora_anotar_cambio(self, texto):
-        """Quién tocó el PIN y cuándo, en el historial del usuario. Cambiar un
-        PIN es tan auditable como usarlo."""
+        """Quién tocó el PIN y cuándo. Cambiar un PIN es tan auditable como
+        usarlo.
+
+        Va al historial del CONTACTO: res.users no lleva chatter propio, lo
+        hereda del partner, y `message_post` solo existe allí."""
         self.ensure_one()
-        self.sudo().message_post(body=Markup('<p>%s</p>') % _(
+        if not self.partner_id:
+            return
+        self.partner_id.sudo().message_post(body=Markup('<p>%s</p>') % _(
             '%(que)s por %(quien)s.', que=texto, quien=self.env.user.name))
 
     # ------------------------------------------------------------------
