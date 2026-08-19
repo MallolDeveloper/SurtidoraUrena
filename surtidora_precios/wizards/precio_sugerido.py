@@ -24,10 +24,9 @@ class PrecioSugerido(models.TransientModel):
     _description = 'Precios y margen del producto'
 
     product_tmpl_id = fields.Many2one('product.template', string='Producto',
-                                      required=True, readonly=True)
-    costo_base = fields.Float(string='Costo sin ITBIS', readonly=True,
-                              digits='Product Price')
-    itbis_pct = fields.Float(string='ITBIS %', readonly=True)
+                                      required=True)
+    costo_base = fields.Float(string='Costo sin ITBIS', digits='Product Price')
+    itbis_pct = fields.Float(string='ITBIS %')
     margen_objetivo = fields.Float(
         string='Margen objetivo %', default=15.0,
         help='Sobre el costo con ITBIS, igual que en el sistema actual.')
@@ -35,7 +34,7 @@ class PrecioSugerido(models.TransientModel):
         string='Redondear a múltiplos de', default=5.0,
         help='El 98% de los precios de la casa son múltiplos de 5.')
     linea_ids = fields.One2many('surtidora.precio.sugerido.linea', 'wizard_id')
-    aviso = fields.Text(readonly=True)
+    aviso = fields.Text()
 
     # ------------------------------------------------------------------
     @api.model
@@ -99,6 +98,10 @@ class PrecioSugerido(models.TransientModel):
             'precio_total': l.precio_nuevo,
         } for l in self.linea_ids
             if l.precio_nuevo and abs(l.precio_nuevo - l.precio_actual) >= 0.01]
+        if any(not l.lista_id or not l.uom_id for l in self.linea_ids):
+            raise UserError(_(
+                'La ventana perdió la lista o la unidad de alguna fila. '
+                'Ciérrela y vuelva a abrirla desde el producto.'))
         if not cambios:
             raise UserError(_('No hay ningún precio modificado.'))
         resultado = self.env['surtidora.precios.motor'].guardar_json(
@@ -120,19 +123,21 @@ class PrecioSugerido(models.TransientModel):
                 'context': self.env.context}
 
 
+# OJO: ninguno de estos campos lleva readonly=True en Python. El cliente
+# web NO envia al guardar los campos readonly a nivel de campo, y las
+# lineas llegaban al servidor sin lista ni unidad ("Lista de precios
+# invalida"). El readonly va en la VISTA, que si transmite el valor.
 class PrecioSugeridoLinea(models.TransientModel):
     _name = 'surtidora.precio.sugerido.linea'
     _description = 'Precio por lista y unidad'
     _order = 'lista_id, factor'
 
     wizard_id = fields.Many2one('surtidora.precio.sugerido', ondelete='cascade')
-    lista_id = fields.Many2one('product.pricelist', string='Lista', readonly=True)
-    uom_id = fields.Many2one('uom.uom', string='Unidad', readonly=True)
-    factor = fields.Float(readonly=True, digits=(16, 4))
-    costo_total = fields.Float(string='Costo c/ITBIS', readonly=True,
-                               digits='Product Price')
-    precio_actual = fields.Float(string='Precio actual', readonly=True,
-                                 digits='Product Price')
+    lista_id = fields.Many2one('product.pricelist', string='Lista')
+    uom_id = fields.Many2one('uom.uom', string='Unidad')
+    factor = fields.Float(digits=(16, 4))
+    costo_total = fields.Float(string='Costo c/ITBIS', digits='Product Price')
+    precio_actual = fields.Float(string='Precio actual', digits='Product Price')
     precio_nuevo = fields.Float(string='Precio nuevo', digits='Product Price',
                                 help='Total del empaque completo, como se '
                                      'habla en el mostrador: "la caja a 880".')

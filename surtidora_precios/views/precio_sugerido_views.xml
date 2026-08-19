@@ -9,9 +9,9 @@
                        nolabel="1" class="alert alert-warning" role="alert"/>
                 <group>
                     <group>
-                        <field name="product_tmpl_id"/>
-                        <field name="costo_base"/>
-                        <field name="itbis_pct" string="ITBIS %"/>
+                        <field name="product_tmpl_id" readonly="1"/>
+                        <field name="costo_base" readonly="1"/>
+                        <field name="itbis_pct" string="ITBIS %" readonly="1"/>
                     </group>
                     <group>
                         <field name="margen_objetivo"/>
@@ -23,15 +23,14 @@
                 <separator string="Precio por lista y unidad"/>
                 <field name="linea_ids" nolabel="1">
                     <list editable="bottom" create="false" delete="false">
-                        <field name="lista_id"/>
-                        <field name="uom_id"/>
-                        <field name="factor" optional="hide"/>
-                        <field name="costo_total"/>
-                        <field name="precio_actual"/>
-                        <field name="margen_actual"
-                               optional="show"/>
+                        <field name="lista_id" readonly="1"/>
+                        <field name="uom_id" readonly="1"/>
+                        <field name="factor" optional="hide" readonly="1"/>
+                        <field name="costo_total" readonly="1"/>
+                        <field name="precio_actual" readonly="1"/>
+                        <field name="margen_actual" optional="show" readonly="1"/>
                         <field name="precio_nuevo"/>
-                        <field name="margen_nuevo"
+                        <field name="margen_nuevo" readonly="1"
                                decoration-danger="margen_nuevo &lt; 0"
                                decoration-warning="margen_nuevo &gt;= 0 and margen_nuevo &lt; 5"
                                decoration-success="margen_nuevo &gt;= 5"/>
