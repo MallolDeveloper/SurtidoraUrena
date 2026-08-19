@@ -413,9 +413,12 @@ class PrecioSugeridoLinea(models.TransientModel):
             linea.factor = fila['factor'] if fila else 0.0
             linea.costo_total = fila['costo_total_itbis'] if fila else 0.0
             linea.precio_actual = fila['precio_total'] if fila else 0.0
+            # sin precio todavía el margen no es -100%: es que no hay precio.
+            # Enseñar -100.00 en un producto nuevo se lee como si algo
+            # estuviera roto, y solo dice que la fila está vacía.
             linea.margen_actual = (
                 (linea.precio_actual - linea.costo_total) / linea.costo_total * 100
-                if linea.costo_total else 0.0)
+                if linea.costo_total and linea.precio_actual else 0.0)
 
     def _margen_de(self, precio):
         self.ensure_one()
