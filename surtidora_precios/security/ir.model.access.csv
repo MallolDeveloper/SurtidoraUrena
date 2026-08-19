@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_precio_sugerido,surtidora.precio.sugerido,model_surtidora_precio_sugerido,sales_team.group_sale_manager,1,1,1,1
+access_precio_sugerido_linea,surtidora.precio.sugerido.linea,model_surtidora_precio_sugerido_linea,sales_team.group_sale_manager,1,1,1,1
