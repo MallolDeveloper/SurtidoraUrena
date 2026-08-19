@@ -92,6 +92,14 @@ class PrecioSugerido(models.TransientModel):
                     'Al aplicar se pondrá al día la ficha.',
                     ficha=datos['precio_ficha'], lista=datos['lista_ficha'],
                     real=datos['precio_ficha_lista']))
+            if datos.get('fraccionadas'):
+                avisos.append(_(
+                    'Este producto tiene %s regla(s) de precio por cantidades '
+                    'menores que una unidad. Odoo aplica siempre la de cantidad '
+                    'MAYOR, así que esas mandan sobre la fila base: el «precio '
+                    'actual» de aquí no es el que cobra el mostrador. Revíselas '
+                    'en la lista de precios antes de tocar nada.')
+                    % datos['fraccionadas'])
             escalera = wizard._describir_escalera(datos['filas'])
             if escalera:
                 avisos.append(_(
@@ -137,6 +145,10 @@ class PrecioSugerido(models.TransientModel):
                 'lista_id': f['lista_id'],
                 'uom_id': f['uom_id'],
                 'precio_nuevo': f['precio_total'],
+                # el margen ya no se calcula solo: lo pone quien fija el precio
+                'margen_nuevo': ((f['precio_total'] - f['costo_total_itbis'])
+                                 / f['costo_total_itbis'] * 100)
+                if f['costo_total_itbis'] else 0.0,
             }) for f in datos['filas']],
         })
         return valores
@@ -164,6 +176,8 @@ class PrecioSugerido(models.TransientModel):
             for linea, fila in zip(lineas, filas):
                 linea.write({'lista_id': fila['lista_id'],
                              'uom_id': fila['uom_id']})
+                # con la lista repuesta ya hay costo: el margen puede decir algo
+                linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)
 
     # ------------------------------------------------------------------
     # Del margen al precio: UNA sola definición, la usan el botón de sugerir
@@ -204,6 +218,7 @@ class PrecioSugerido(models.TransientModel):
                 continue
             linea.precio_nuevo = self.precio_desde_margen(
                 linea.costo_total, self.margen_objetivo, paso)
+            linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)
         return self._reabrir()
 
     def action_aplicar(self):
@@ -265,9 +280,16 @@ class PrecioSugeridoLinea(models.TransientModel):
                                  compute='_compute_desde_producto')
     margen_actual = fields.Float(string='Margen actual %',
                                  compute='_compute_desde_producto')
+    # OJO: campo LLANO, no computado con inverse. Con inverse, el ORM
+    # escribía primero `precio_nuevo` y DESPUÉS corría el inverse, que volvía
+    # a pasar el precio por el redondeo: teclear 3,883 guardaba 3,885, y un
+    # precio bajo costo se subía solo sin que RB-08 llegara a avisar. En el
+    # primer guardado pasaba lo contrario — el inverse corría antes de que
+    # `_reponer_lineas` pusiera la lista, así que el margen tecleado se perdía
+    # en silencio. Con dos onchange el cliente resuelve las dos direcciones y
+    # lo que queda en pantalla es exactamente lo que se guarda.
     margen_nuevo = fields.Float(
-        string='Margen nuevo %', compute='_compute_margen_nuevo',
-        inverse='_inverse_margen_nuevo', readonly=False,
+        string='Margen nuevo %',
         help='Se puede teclear: escriba el margen y el precio se calcula solo, '
              'redondeado; o escriba el precio y aquí verá el margen que deja. '
              'Sirve para dar a Mayor un margen distinto que a Detalle.')
@@ -291,21 +313,27 @@ class PrecioSugeridoLinea(models.TransientModel):
                 (linea.precio_actual - linea.costo_total) / linea.costo_total * 100
                 if linea.costo_total else 0.0)
 
-    @api.depends('precio_nuevo', 'costo_total')
-    def _compute_margen_nuevo(self):
-        for linea in self:
-            linea.margen_nuevo = (
-                (linea.precio_nuevo - linea.costo_total) / linea.costo_total * 100
-                if linea.costo_total else 0.0)
+    def _margen_de(self, precio):
+        self.ensure_one()
+        return ((precio - self.costo_total) / self.costo_total * 100
+                if self.costo_total else 0.0)
 
-    def _inverse_margen_nuevo(self):
-        """El margen tecleado manda el precio. Al redondear, el margen que
-        queda no es exacto —20% sobre 90.00 con múltiplos de 5 da 110.00, o
-        sea 22.2%— y la columna lo vuelve a mostrar: el precio es el maestro
-        y el margen el termómetro, igual que en ADG."""
+    @api.onchange('precio_nuevo')
+    def _onchange_precio_nuevo(self):
+        """Se teclea el precio: el margen es el termómetro que lo acompaña."""
+        for linea in self:
+            linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)
+
+    @api.onchange('margen_nuevo')
+    def _onchange_margen_nuevo(self):
+        """Se teclea el margen: manda el precio, redondeado. El que queda no
+        es el tecleado —20% sobre 90.00 con múltiplos de 5 da 110.00, o sea
+        22.2%— y la columna lo muestra: el precio es el maestro y el margen el
+        termómetro, igual que en ADG."""
         for linea in self:
             if not linea.costo_total or not linea.wizard_id:
                 continue
             linea.precio_nuevo = linea.wizard_id.precio_desde_margen(
                 linea.costo_total, linea.margen_nuevo,
                 linea.wizard_id._paso_redondeo())
+            linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)

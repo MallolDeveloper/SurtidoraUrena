@@ -56,6 +56,22 @@ patch(PosOrderline.prototype, {
         return bruto / (1 + tasa / 100);
     },
 
+    /** El mismo precio efectivo pero CON impuestos. Es la base en la que el
+     * backend graba `surtidora.autorizacion.precio` (price_reduce_taxinc) y
+     * en la que viene el precio de tarifa; mezclarlas hacía que una misma
+     * rebaja se viera 13 puntos mayor si venía del mostrador. */
+    get surtiPrecioEfectivoConItbis() {
+        try {
+            const unitario = this.unitPrices;
+            if (unitario && typeof unitario.total_included === "number") {
+                return unitario.total_included;
+            }
+        } catch {
+            // la línea todavía no entró en el cálculo de impuestos del pedido
+        }
+        return this.price_unit * (1 - (this.getDiscount() || 0) / 100);
+    },
+
     /** ¿La línea está por debajo del costo? (pinta el rojo del template)
      *
      * La línea del producto combo es una CABECERA: Odoo la deja en 0.00 y
@@ -171,7 +187,7 @@ patch(OrderPaymentValidation.prototype, {
                     this.order.getPartner()?.id || false,
                     lineas.map((l) => ({
                         product_id: l.product_id.id,
-                        precio: l.surtiPrecioEfectivo,
+                        precio: l.surtiPrecioEfectivoConItbis,
                         precio_lista: this._surtiPrecioLista(l),
                         cantidad: l.qty,
                     })),

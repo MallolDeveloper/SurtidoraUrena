@@ -73,6 +73,15 @@ class PreciosMotor(models.AbstractModel):
             # reglas que esta pantalla NO edita (variantes, promos con fecha,
             # cantidades fraccionadas): se avisan, no se ocultan
             'reglas_extra': extras,
+            # reglas de cantidad fraccionaria (0 < min_qty < 1): Odoo aplica la
+            # de min_quantity MAYOR, así que esa gana sobre la fila base y el
+            # «precio actual» de esta pantalla no es el que se cobra
+            'fraccionadas': self.env['product.pricelist.item'].search_count([
+                ('product_tmpl_id', '=', tmpl.id),
+                ('compute_price', '=', 'fixed'),
+                ('min_quantity', '>', 0.0),
+                ('min_quantity', '<', 1.0),
+            ]),
         }
 
     @api.model
@@ -116,6 +125,15 @@ class PreciosMotor(models.AbstractModel):
             unitario = total / factor
             if regla:
                 regla.fixed_price = unitario
+                # Un producto puede traer DOS reglas base para la misma lista,
+                # una con min_quantity 0 y otra con 1 (12 pares en la carga de
+                # ADG). Para Odoo no son la misma: la de 1 no aplica a media
+                # libra, así que la de 0 gobierna las ventas fraccionadas. Si
+                # solo se mueve la ganadora, el queso sube a 260 por libra y
+                # sigue saliendo a 240 la media. Se mueven las dos.
+                hermanas = self._reglas_base_hermanas(tmpl, lista_id, regla)
+                if hermanas:
+                    hermanas.fixed_price = unitario
             else:
                 Item.create({
                     'pricelist_id': lista_id,
@@ -140,7 +158,8 @@ class PreciosMotor(models.AbstractModel):
             titulo = _('Mantenimiento de precios por %s:', self.env.user.name)
             cuerpo = Markup('<br/>').join(
                 [escape(titulo)] + [escape(l) for l in bitacora])
-            tmpl.message_post(body=cuerpo)
+            # message_post también exige escritura sobre el documento
+            tmpl.sudo().message_post(body=cuerpo)
         return {'ok': True, 'cambios': len(bitacora), 'avisos': avisos}
 
     # ------------------------------------------------------------------
@@ -167,8 +186,30 @@ class PreciosMotor(models.AbstractModel):
         anterior = tmpl.list_price or 0.0
         if abs(anterior - nuevo) < 0.01:
             return None
-        tmpl.list_price = nuevo
+        # sudo: _verificar_grupo() ya dijo quién puede estar aquí, pero
+        # escribir en product.template exige el grupo «Products / Create», que
+        # un Gerente de Ventas NO tiene — sin esto, Aplicar revienta con
+        # AccessError justo al final y se revierte todo el guardado.
+        tmpl.sudo().list_price = nuevo
         return anterior, nuevo, lista.name
+
+    def _reglas_base_hermanas(self, tmpl, lista_id, regla):
+        """Las otras reglas BASE del mismo producto y lista — min_quantity 0
+        o 1, que en la práctica significan lo mismo. NO incluye los cortes por
+        cantidad de verdad (un 0.08 es otra regla, con su propio precio)."""
+        candidatas = self.env['product.pricelist.item'].search([
+            ('pricelist_id', '=', lista_id),
+            ('product_tmpl_id', '=', tmpl.id),
+            ('compute_price', '=', 'fixed'),
+            ('applied_on', '=', '1_product'),
+            ('product_id', '=', False),
+            ('date_start', '=', False),
+            ('date_end', '=', False),
+            ('min_quantity', '<=', 1.0),
+            ('id', '!=', regla.id),
+        ])
+        return candidatas.filtered(
+            lambda r: r.min_quantity < _TOL or abs(r.min_quantity - 1.0) < _TOL)
 
     def _verificar_grupo(self):
         if not self.env.user.has_group(_GRUPO):
@@ -248,6 +289,16 @@ class PreciosMotor(models.AbstractModel):
             ('applied_on', '!=', '1_product'),
             ('product_id', '!=', False),
             '|', ('date_start', '!=', False), ('date_end', '!=', False),
+        ])
+        # Las reglas GLOBALES y por CATEGORÍA llevan product_tmpl_id vacío, así
+        # que el filtro de arriba nunca las veía — y son justo las que ponen el
+        # precio cuando la lista no tiene regla propia del producto. El aviso
+        # daba 0 y hacía creer que aquí se veía todo.
+        extras += self.env['product.pricelist.item'].search_count([
+            ('pricelist_id', 'in', self._listas().ids),
+            '|', ('applied_on', '=', '3_global'),
+            '&', ('applied_on', '=', '2_product_category'),
+            ('categ_id', 'parent_of', tmpl.categ_id.id),
         ])
         return indice, extras
 
