@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Motor del mantenimiento de precios: los datos los arma el servidor, la
-pantalla solo pinta y recalcula el margen en vivo (mismo principio
-motor/pantalla del sugerido).
+"""Motor del mantenimiento de precios: los datos los arma el servidor y el
+asistente de la ficha del producto solo los presenta.
 
 Reglas de negocio ancladas en la auditoría rev.3:
 - El PRECIO es el maestro; el % de margen es indicador derivado.
@@ -24,26 +23,11 @@ class PreciosMotor(models.AbstractModel):
     _description = 'Motor del mantenimiento de precios por lista y empaque'
 
     # ------------------------------------------------------------------
-    # Fachadas JSON de la pantalla
+    # Fachadas JSON del asistente
     # ------------------------------------------------------------------
     @api.model
-    def buscar_json(self, texto):
-        """Productos por código, nombre o barcode (para el typeahead)."""
-        self._verificar_grupo()
-        if not texto or len(texto.strip()) < 2:
-            return []
-        texto = texto.strip()
-        productos = self.env['product.template'].search(
-            ['&', ('sale_ok', '=', True),
-             '|', '|', ('default_code', 'ilike', texto),
-             ('name', 'ilike', texto), ('barcode', 'ilike', texto)],
-            limit=30, order='default_code')
-        return [{'id': p.id, 'ref': p.default_code or '', 'nombre': p.name}
-                for p in productos]
-
-    @api.model
     def producto_json(self, template_id):
-        """Todo lo que la pantalla necesita del producto, en una llamada."""
+        """Todo lo que el asistente necesita del producto, en una llamada."""
         self._verificar_grupo()
         tmpl = self.env['product.template'].browse(int(template_id))
         tmpl = tmpl.with_company(self.env.company)

@@ -70,7 +70,7 @@ class AutorizarPrecioWizard(models.TransientModel):
                 'uom_id': line.product_uom_id.id,
                 'cantidad': line.product_uom_qty,
                 'precio_lista': wl.precio_lista,
-                'precio_autorizado': line.price_unit,
+                'precio_autorizado': line.price_reduce_taxinc,
                 'currency_id': line.currency_id.id,
                 'solicitante_id': self.env.user.id,
                 'autorizador_id': autorizador.id,
@@ -91,8 +91,12 @@ class AutorizarPrecioLinea(models.TransientModel):
     uom_id = fields.Many2one(related='line_id.product_uom_id', string='Unidad')
     cantidad = fields.Float(related='line_id.product_uom_qty', string='Cantidad')
     precio_lista = fields.Monetary(currency_field='currency_id', string='Precio de lista', readonly=True)
-    # price_unit es Float (no Monetary) en sale.order.line — el related debe coincidir
+    # Lo que el cliente PAGA por unidad (precio menos descuento, con ITBIS),
+    # no price_unit: el supervisor tiene que ver el número que va a autorizar.
+    # Con price_unit veía 100.00 mientras la línea llevaba 99% de descuento.
+    # price_reduce_taxinc es Float en sale.order.line: el related debe coincidir.
     precio_propuesto = fields.Float(
-        related='line_id.price_unit', string='Precio propuesto', digits='Product Price')
+        related='line_id.price_reduce_taxinc', string='Precio propuesto',
+        digits='Product Price')
     currency_id = fields.Many2one(related='line_id.currency_id')
     bajo_costo = fields.Boolean(string='¡Bajo costo!', readonly=True)

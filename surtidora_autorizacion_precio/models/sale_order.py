@@ -10,7 +10,8 @@ class SaleOrder(models.Model):
         compute='_compute_requiere_autorizacion_precio',
         help='Hay líneas con precio bajo lista pendientes de autorizar.')
 
-    @api.depends('order_line.price_unit', 'order_line.product_uom_id',
+    @api.depends('order_line.price_unit', 'order_line.discount',
+                 'order_line.product_uom_qty', 'order_line.product_uom_id',
                  'order_line.autorizacion_id')
     def _compute_requiere_autorizacion_precio(self):
         for order in self:
@@ -37,8 +38,8 @@ class SaleOrder(models.Model):
                 raise UserError(_(
                     'Venta BAJO COSTO bloqueada (regla de la empresa, sin '
                     'excepciones):\n%s',
-                    '\n'.join('  • %s: precio %.2f < costo %.2f' % (
-                        l.product_id.display_name, l.price_unit, l._costo_en_uom())
+                    '\n'.join('  • %s: precio %.2f sin ITBIS < costo %.2f' % (
+                        l.product_id.display_name, l.price_reduce_taxexcl, l._costo_en_uom())
                         for l in bajo_costo)))
             pendientes = order._lineas_pendientes()
             if pendientes:
@@ -47,7 +48,7 @@ class SaleOrder(models.Model):
                     'Use el botón "Autorizar precios" — un supervisor debe '
                     'aprobar con su PIN.',
                     '\n'.join('  • %s: %.2f (lista: %.2f)' % (
-                        l.product_id.display_name, l.price_unit, l._precio_de_lista())
+                        l.product_id.display_name, l.price_reduce_taxinc, l._precio_de_lista())
                         for l in pendientes)))
         return super().action_confirm()
 

@@ -20,8 +20,14 @@ import { ask, makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dial
  *    supervisor + doble confirmación, y queda auditada. El PIN se valida
  *    en el servidor; sin conexión no hay excepción.
  *
- * La comparación es la misma regla RB-08 del backend: precio de la línea
- * vs costo del producto (sin ITBIS).
+ * La comparación es la misma regla RB-08 del backend, y va SIN ITBIS en los
+ * dos lados. Esto no es un detalle: el ITBIS de Surtidora está configurado
+ * como incluido en el precio, así que `price_unit` LLEVA el 18% mientras que
+ * `standard_price` no lo lleva. Compararlos de frente regalaba una franja
+ * entera del 18% — un artículo de costo 76.27 (piso real 90.00 con ITBIS) se
+ * podía cobrar a 76.28 sin que la línea se pintara de rojo ni se pidiera PIN.
+ * El propio Odoo hace esta resta antes de mostrar el margen en "Info del
+ * producto": priceWithoutTax = tax_details.total_excluded.
  */
 
 patch(PosOrderline.prototype, {
@@ -30,10 +36,24 @@ patch(PosOrderline.prototype, {
         return this.product_id?.standard_price || 0;
     },
 
-    /** Precio efectivo por unidad, con el descuento aplicado. */
+    /** Precio por unidad en la MISMA base que el costo: con el descuento
+     * aplicado y SIN impuestos. Odoo ya lo calcula por línea. */
     get surtiPrecioEfectivo() {
-        const descuento = this.getDiscount() || 0;
-        return this.price_unit * (1 - descuento / 100);
+        try {
+            const unitario = this.unitPrices;
+            if (unitario && typeof unitario.total_excluded === "number") {
+                return unitario.total_excluded;
+            }
+        } catch {
+            // la línea todavía no entró en el cálculo de impuestos del pedido
+        }
+        // Respaldo: se descuenta a mano la tasa de los impuestos que van
+        // INCLUIDOS en el precio (los que se cobran aparte no inflan price_unit).
+        const incluidos = (this.tax_ids || []).filter(
+            (t) => t.price_include && t.amount_type === "percent");
+        const tasa = incluidos.reduce((suma, t) => suma + (t.amount || 0), 0);
+        const bruto = this.price_unit * (1 - (this.getDiscount() || 0) / 100);
+        return bruto / (1 + tasa / 100);
     },
 
     /** ¿La línea está por debajo del costo? (pinta el rojo del template) */
@@ -70,7 +90,7 @@ patch(OrderPaymentValidation.prototype, {
         const fmt = (v) => this.pos.env.utils.formatCurrency(v);
         const detalle = lineas
             .map((l) => `• ${l.product_id.display_name}: ${fmt(l.surtiPrecioEfectivo)} ` +
-                `${_t("(costo")} ${fmt(l.surtiCosto)})`)
+                `${_t("sin ITBIS (costo")} ${fmt(l.surtiCosto)})`)
             .join("\n");
 
         // 1. Aviso rojo con la puerta a la excepción
