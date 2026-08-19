@@ -4,7 +4,7 @@
 El PIN se valida AQUÍ (el hash nunca viaja al navegador) y la auditoría
 reutiliza surtidora.autorizacion.precio, la misma bitácora del backend."""
 from odoo import _, api, models
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 
 
 class PosAutorizacion(models.AbstractModel):
@@ -29,7 +29,12 @@ class PosAutorizacion(models.AbstractModel):
         self._verificar_pos_user()
         if not pin or not lineas:
             return {'ok': False}
-        autorizador = self.env['res.users']._surtidora_verificar_pin(str(pin))
+        try:
+            autorizador = self.env['res.users']._surtidora_verificar_pin(str(pin))
+        except UserError as bloqueo:
+            # demasiados intentos: el cajero tiene que saber POR QUÉ no entra,
+            # o lo va a seguir intentando creyendo que se equivocó de tecla
+            return {'ok': False, 'mensaje': str(bloqueo)}
         if not autorizador:
             return {'ok': False}
         Auditoria = self.env['surtidora.autorizacion.precio'].sudo()

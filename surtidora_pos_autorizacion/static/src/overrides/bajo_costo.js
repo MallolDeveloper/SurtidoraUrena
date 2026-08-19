@@ -197,8 +197,9 @@ patch(OrderPaymentValidation.prototype, {
         }
         if (!resultado.ok) {
             dialog.add(AlertDialog, {
-                title: _t("PIN incorrecto"),
-                body: _t("El PIN no corresponde a ningún autorizador de precios."),
+                title: resultado.mensaje ? _t("Autorización bloqueada") : _t("PIN incorrecto"),
+                body: resultado.mensaje ||
+                    _t("El PIN no corresponde a ningún autorizador de precios."),
             });
             return false;
         }
