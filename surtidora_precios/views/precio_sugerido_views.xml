@@ -14,8 +14,9 @@
                         <field name="itbis_pct" string="ITBIS %" readonly="1"/>
                     </group>
                     <group>
-                        <field name="margen_objetivo"/>
-                        <field name="descuento_empaque"/>
+                        <field name="modo" widget="radio"/>
+                        <field name="margen_objetivo" invisible="modo != 'uniforme'"/>
+                        <field name="descuento_empaque" invisible="modo != 'uniforme'"/>
                         <field name="redondeo"/>
                         <button name="action_sugerir" type="object"
                                 string="Sugerir desde el costo" class="btn-secondary"/>

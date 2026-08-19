@@ -42,6 +42,14 @@ class PrecioSugerido(models.TransientModel):
                               digits='Product Price')
     itbis_pct = fields.Float(string='ITBIS %', compute='_compute_cabecera')
     aviso = fields.Text(compute='_compute_cabecera')
+    modo = fields.Selection(
+        [('casa', 'Como vende la casa (cada lista con lo suyo)'),
+         ('uniforme', 'Un solo margen para las cuatro listas')],
+        string='Cómo sugerir', default='casa', required=True,
+        help='«Como vende la casa» usa la escalera medida en el propio '
+             'catálogo: Mayor con margen ajustado y sin descuento de empaque '
+             '—ya es el precio de volumen—, y las otras tres con más margen '
+             'en la unidad y descuento al llevar el empaque completo.')
     margen_objetivo = fields.Float(
         string='Margen de la unidad %',
         default=lambda self: self.env.company.surtidora_margen_unidad_pct,
@@ -237,13 +245,16 @@ class PrecioSugerido(models.TransientModel):
                 'y vuelva a intentarlo; mientras tanto puede teclear los '
                 'precios a mano.'))
         paso = self._paso_redondeo()
+        Escalera = self.env['surtidora.margen.lista']
         # 1ª pasada: la unidad base de cada lista, por margen sobre el costo
-        unidad_por_lista = {}
+        unidad_por_lista, ajuste_por_lista = {}, {}
         for linea in self.linea_ids:
             if linea.factor > 1 or not linea.costo_total:
                 continue
+            margen, descuento = self._ajuste_de(Escalera, linea.lista_id.id)
+            ajuste_por_lista[linea.lista_id.id] = descuento
             linea.precio_nuevo = self.precio_desde_margen(
-                linea.costo_total, self.margen_objetivo, paso)
+                linea.costo_total, margen, paso)
             linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)
             unidad_por_lista[linea.lista_id.id] = linea.precio_nuevo
         # 2ª pasada: cada empaque, a partir de SU unidad y de la misma lista
@@ -251,14 +262,24 @@ class PrecioSugerido(models.TransientModel):
             if linea.factor <= 1 or not linea.costo_total:
                 continue
             unidad = unidad_por_lista.get(linea.lista_id.id)
-            bruto = (unidad * linea.factor * (1 - self.descuento_empaque / 100.0)
-                     if unidad
-                     # sin unidad base en esa lista no hay de dónde colgarlo:
-                     # se cae al margen, que siempre da un número razonable
-                     else linea.costo_total * (1 + self.margen_objetivo / 100.0))
+            if unidad:
+                descuento = ajuste_por_lista.get(linea.lista_id.id, 0.0)
+                bruto = unidad * linea.factor * (1 - descuento / 100.0)
+            else:
+                # sin unidad base en esa lista no hay de dónde colgarlo:
+                # se cae al margen, que siempre da un número razonable
+                margen, _d = self._ajuste_de(Escalera, linea.lista_id.id)
+                bruto = linea.costo_total * (1 + margen / 100.0)
             linea.precio_nuevo = self._redondear(bruto, linea.costo_total, paso)
             linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)
         return self._reabrir()
+
+    def _ajuste_de(self, Escalera, lista_id):
+        """El (margen, descuento) que toca a esa lista según el modo elegido."""
+        self.ensure_one()
+        if self.modo == 'uniforme':
+            return self.margen_objetivo, self.descuento_empaque
+        return Escalera.para_lista(lista_id)
 
     def action_aplicar(self):
         """Escribe solo las filas que cambiaron, por el motor (que valida

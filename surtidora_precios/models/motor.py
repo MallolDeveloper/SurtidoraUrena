@@ -9,6 +9,8 @@ Reglas de negocio ancladas en la auditoría rev.3:
 - RB-08: no se FIJA un precio de lista bajo costo — salvo que la fila ya
   esté bajo costo (dato migrado de ADG: 323 reglas en 67 productos) y el
   cambio MEJORE la brecha; empeorarla sigue bloqueado."""
+import statistics
+
 from markupsafe import Markup, escape
 
 from odoo import _, api, models
@@ -205,6 +207,70 @@ class PreciosMotor(models.AbstractModel):
         ])
         return candidatas.filtered(
             lambda r: r.min_quantity < _TOL or abs(r.min_quantity - 1.0) < _TOL)
+
+    def medir_escalera_del_catalogo(self):
+        """Qué margen y qué descuento por empaque usa la casa, lista por lista.
+
+        Devuelve ({lista_id: margen%}, {lista_id: descuento%}), con MEDIANAS.
+        Se usa la mediana y no el promedio a propósito: hay productos con
+        márgenes de 300% que arrastrarían el promedio a un número que no
+        representa a nadie.
+
+        Solo entran los productos con ESCALERA (precios distintos entre
+        listas). Los que tienen las cuatro iguales vienen así de la carga de
+        ADG; meterlos aplanaría justo la variedad que se quiere reproducir.
+        """
+        self._verificar_grupo()
+        itbis_de = {}
+        plantillas = {}
+        for t in self.env['product.template'].search_read(
+                [('sale_ok', '=', True), ('standard_price', '>', 0)],
+                ['standard_price', 'taxes_id']):
+            plantillas[t['id']] = t
+        impuestos = {x['id']: x['amount'] for x in
+                     self.env['account.tax'].search_read([], ['amount'])}
+        listas = self._listas()
+        reglas = self.env['product.pricelist.item'].search_read([
+            ('compute_price', '=', 'fixed'), ('applied_on', '=', '1_product'),
+            ('pricelist_id', 'in', listas.ids), ('product_tmpl_id', '!=', False),
+        ], ['product_tmpl_id', 'pricelist_id', 'min_quantity', 'fixed_price'])
+
+        # producto -> factor -> lista -> precio POR UNIDAD
+        por_producto = {}
+        for r in reglas:
+            factor = r['min_quantity'] if r['min_quantity'] > 1 else 1.0
+            por_producto.setdefault(r['product_tmpl_id'][0], {}).setdefault(
+                factor, {})[r['pricelist_id'][0]] = r['fixed_price']
+
+        margenes, descuentos = {}, {}
+        for tmpl_id, por_factor in por_producto.items():
+            datos = plantillas.get(tmpl_id)
+            base = por_factor.get(1.0)
+            if not datos or not base or len(base) < 2:
+                continue
+            if len(set(round(p, 4) for p in base.values())) < 2:
+                continue  # sin escalera: no dice nada sobre la política
+            itbis = sum(impuestos.get(i, 0) for i in datos['taxes_id']) / 100.0
+            costo = datos['standard_price'] * (1 + itbis)
+            if costo <= 0:
+                continue
+            for lista_id, precio in base.items():
+                if precio > 0:
+                    margenes.setdefault(lista_id, []).append(
+                        (precio - costo) / costo * 100)
+            for factor, fila in por_factor.items():
+                if factor <= 1:
+                    continue
+                for lista_id, precio_empaque in fila.items():
+                    unitario = base.get(lista_id)
+                    if unitario and unitario > 0 and precio_empaque > 0:
+                        rebaja = (1 - precio_empaque / unitario) * 100
+                        if -30 < rebaja < 80:  # fuera los datos absurdos
+                            descuentos.setdefault(lista_id, []).append(rebaja)
+        return (
+            {k: statistics.median(v) for k, v in margenes.items() if len(v) >= 20},
+            {k: statistics.median(v) for k, v in descuentos.items() if len(v) >= 20},
+        )
 
     def _verificar_grupo(self):
         if not self.env.user.has_group(_GRUPO):
