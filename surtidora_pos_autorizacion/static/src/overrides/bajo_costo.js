@@ -135,14 +135,18 @@ patch(OrderPaymentValidation.prototype, {
         let motivos;
         try {
             motivos = await this.pos.data.call("surtidora.pos.autorizacion", "motivos", []);
-        } catch {
-            motivos = [];
+        } catch (error) {
+            dialog.add(AlertDialog, this._surtiMotivoDelFallo(error));
+            return false;
         }
         if (!motivos.length) {
+            // ojo: esto ya NO es un problema de conexión — el servidor
+            // contestó y dijo que no hay motivos cargados
             dialog.add(AlertDialog, {
-                title: _t("Sin conexión o sin motivos"),
-                body: _t("No se pudo cargar el catálogo de motivos. La excepción " +
-                    "bajo costo no puede autorizarse sin conexión."),
+                title: _t("Sin motivos configurados"),
+                body: _t("El catálogo de motivos de descuento está vacío, y sin " +
+                    "motivo no se puede autorizar una venta bajo costo. Pida a un " +
+                    "administrador que cargue el catálogo."),
             });
             return false;
         }
@@ -192,15 +196,17 @@ patch(OrderPaymentValidation.prototype, {
                         cantidad: l.qty,
                     })),
                 ]);
-        } catch {
-            resultado = { ok: false };
+        } catch (error) {
+            dialog.add(AlertDialog, this._surtiMotivoDelFallo(error));
+            return false;
         }
         if (!resultado.ok) {
-            dialog.add(AlertDialog, {
-                title: resultado.mensaje ? _t("Autorización bloqueada") : _t("PIN incorrecto"),
-                body: resultado.mensaje ||
-                    _t("El PIN no corresponde a ningún autorizador de precios."),
-            });
+            dialog.add(AlertDialog, resultado.mensaje
+                ? { title: _t("Autorización bloqueada"), body: resultado.mensaje }
+                : {
+                    title: _t("PIN incorrecto"),
+                    body: _t("El PIN no corresponde a ningún autorizador de precios."),
+                });
             return false;
         }
 
@@ -213,6 +219,43 @@ patch(OrderPaymentValidation.prototype, {
             _t("Excepción bajo costo autorizada por %s", resultado.autorizador),
             { type: "success" });
         return true;
+    },
+
+    /** Por qué falló la llamada, dicho en cristiano.
+     *
+     * Antes cualquier tropiezo —red caída, permiso, error del servidor—
+     * acababa en el mismo cuadro «PIN incorrecto», y el cajero se ponía a
+     * teclear el PIN otra vez para nada mientras el problema era otro.
+     *
+     * En los tres casos la venta sigue BLOQUEADA: fallar hacia el lado
+     * seguro no se negocia. Lo que cambia es que ahora se sabe por qué.
+     *
+     * No se importan las clases de error a propósito: se mira lo que el
+     * objeto trae. Un import que no resuelva tumbaría todo el bundle del
+     * mostrador, y esto tiene que ser a prueba de versiones. */
+    _surtiMotivoDelFallo(error) {
+        if (error?.name === "RPC_ERROR") {
+            const clase = error.data?.name || error.exceptionName || "";
+            const texto = error.data?.message || error.message || "";
+            if (clase.includes("AccessError")) {
+                return {
+                    title: _t("Sin permiso"),
+                    body: texto || _t("Su usuario no tiene permiso para autorizar " +
+                        "excepciones desde el mostrador. Avise a un administrador."),
+                };
+            }
+            return {
+                title: _t("El servidor rechazó la autorización"),
+                body: texto || _t("Vuelva a intentarlo; si sigue igual, avise a sistemas. " +
+                    "La venta NO quedó autorizada."),
+            };
+        }
+        return {
+            title: _t("Sin conexión con el servidor"),
+            body: _t("No se pudo consultar al servidor, así que la autorización NO " +
+                "quedó registrada y la venta sigue bloqueada. El PIN no tiene nada " +
+                "que ver: revise la conexión y vuelva a intentarlo."),
+        };
     },
 
     _surtiPrecioLista(linea) {
