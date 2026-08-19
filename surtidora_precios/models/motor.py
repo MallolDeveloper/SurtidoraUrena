@@ -33,7 +33,7 @@ class PreciosMotor(models.AbstractModel):
         tmpl = tmpl.with_company(self.env.company)
         itbis = self._tasa_itbis(tmpl)
         unidades = self._unidades(tmpl)
-        reglas, extras = self._reglas_por_clave(tmpl)
+        reglas, extras, fraccionadas = self._reglas_por_clave(tmpl)
         filas = []
         for lista in self._listas():
             for u in unidades:
@@ -76,12 +76,7 @@ class PreciosMotor(models.AbstractModel):
             # reglas de cantidad fraccionaria (0 < min_qty < 1): Odoo aplica la
             # de min_quantity MAYOR, así que esa gana sobre la fila base y el
             # «precio actual» de esta pantalla no es el que se cobra
-            'fraccionadas': self.env['product.pricelist.item'].search_count([
-                ('product_tmpl_id', '=', tmpl.id),
-                ('compute_price', '=', 'fixed'),
-                ('min_quantity', '>', 0.0),
-                ('min_quantity', '<', 1.0),
-            ]),
+            'fraccionadas': fraccionadas,
         }
 
     @api.model
@@ -94,7 +89,7 @@ class PreciosMotor(models.AbstractModel):
         tmpl = self.env['product.template'].browse(int(template_id))
         tmpl = tmpl.with_company(self.env.company)
         itbis = self._tasa_itbis(tmpl)
-        reglas, _extras = self._reglas_por_clave(tmpl)
+        reglas, _extras, _frac = self._reglas_por_clave(tmpl)
         listas_ok = {l.id for l in self._listas()}
         Item = self.env['product.pricelist.item']
         bitacora, avisos = [], []
@@ -178,7 +173,7 @@ class PreciosMotor(models.AbstractModel):
         lista = self.env.company.surtidora_lista_precio_ficha
         if not lista:
             return None
-        reglas, _e = self._reglas_por_clave(tmpl)  # releído: ya se escribió
+        reglas, _e, _f = self._reglas_por_clave(tmpl)  # releído: ya se escribió
         regla = reglas.get(self._clave(lista.id, 1.0))
         if not regla:
             return None
@@ -267,7 +262,7 @@ class PreciosMotor(models.AbstractModel):
             ('date_end', '=', False),
         ])
         factores = [u['factor'] for u in self._unidades(tmpl)]
-        indice, extras = {}, 0
+        indice, extras, fraccionadas = {}, 0, 0
         for r in sorted(reglas, key=lambda r: (r.min_quantity, r.id)):
             mq = r.min_quantity
             if mq < _TOL or abs(mq - 1.0) < _TOL:
@@ -281,8 +276,13 @@ class PreciosMotor(models.AbstractModel):
                            if f > 1 and abs(mq - f) < _TOL), None)
             if factor is not None:
                 indice[self._clave(r.pricelist_id.id, factor)] = r
+            elif mq < 1.0:
+                # 0 < min_quantity < 1: no es una fila más, es la regla que
+                # GANA sobre la base (Odoo aplica la de cantidad mayor), así
+                # que se avisa aparte y con nombre propio
+                fraccionadas += 1
             else:
-                extras += 1  # fraccionadas u otros min_qty: no se editan aquí
+                extras += 1  # otros min_qty sueltos: no se editan aquí
         extras += self.env['product.pricelist.item'].search_count([
             ('product_tmpl_id', '=', tmpl.id),
             '|', '|', '|', ('compute_price', '!=', 'fixed'),
@@ -305,7 +305,7 @@ class PreciosMotor(models.AbstractModel):
             '&', ('applied_on', '=', '2_product_category'),
             ('categ_id', 'parent_of', tmpl.categ_id.id),
         ])
-        return indice, extras
+        return indice, extras, fraccionadas
 
     @staticmethod
     def _clave(lista_id, factor):
