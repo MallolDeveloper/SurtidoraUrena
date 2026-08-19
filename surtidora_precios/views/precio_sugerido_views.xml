@@ -30,7 +30,7 @@
                         <field name="precio_actual" readonly="1"/>
                         <field name="margen_actual" optional="show" readonly="1"/>
                         <field name="precio_nuevo"/>
-                        <field name="margen_nuevo" readonly="1"
+                        <field name="margen_nuevo"
                                decoration-danger="margen_nuevo &lt; 0"
                                decoration-warning="margen_nuevo &gt;= 0 and margen_nuevo &lt; 5"
                                decoration-success="margen_nuevo &gt;= 5"/>
@@ -40,8 +40,10 @@
                     El precio es el del empaque COMPLETO — «la caja a 880» —;
                     la conversión a unidad base la hace el sistema. El margen
                     se calcula sobre el costo con ITBIS, igual que en el
-                    sistema actual. Ningún precio puede quedar por debajo del
-                    costo (regla RB-08).
+                    sistema actual, y <b>se puede teclear</b>: escriba el margen
+                    y el precio sale solo, redondeado. Así se le da a Mayor un
+                    margen distinto que a Detalle. Ningún precio puede quedar
+                    por debajo del costo (regla RB-08).
                 </p>
                 <footer>
                     <button string="Aplicar" name="action_aplicar" type="object"

@@ -65,6 +65,13 @@ class PrecioSugerido(models.TransientModel):
             if not datos['costo_base']:
                 avisos.append(_('El producto no tiene costo: sin costo no hay '
                                 'margen que calcular ni piso que respetar.'))
+            escalera = wizard._describir_escalera(datos['filas'])
+            if escalera:
+                avisos.append(_(
+                    'Este producto NO cobra lo mismo en todas las listas: %s. '
+                    '«Sugerir precios» aplica un solo margen y las igualaría; '
+                    'ajuste el margen de cada fila si quiere conservar la '
+                    'diferencia.') % escalera)
             if datos['reglas_extra']:
                 avisos.append(_(
                     'Este producto tiene %s regla(s) de precio que esta ventana '
@@ -72,6 +79,21 @@ class PrecioSugerido(models.TransientModel):
                     'fraccionadas). Se editan desde la lista de precios.')
                     % datos['reglas_extra'])
             wizard.aviso = '\n'.join(avisos)
+
+    @staticmethod
+    def _describir_escalera(filas):
+        """Si una misma unidad se cobra distinto según la lista, lo describe
+        («Paquete: de 4.31 a 6.58»). Devuelve '' si todas van iguales.
+
+        Es el 14% del catálogo: la lista de Mayor suele ir por debajo de las
+        demás, y aplanarla de un clic sería perder el precio de mayorista."""
+        por_unidad = {}
+        for f in filas:
+            if f['precio_total']:
+                por_unidad.setdefault(f['unidad'], set()).add(round(f['precio_total'], 2))
+        partes = ['%s: de %.2f a %.2f' % (unidad, min(precios), max(precios))
+                  for unidad, precios in por_unidad.items() if len(precios) > 1]
+        return '; '.join(partes)
 
     # ------------------------------------------------------------------
     @api.model
@@ -117,9 +139,29 @@ class PrecioSugerido(models.TransientModel):
                              'uom_id': fila['uom_id']})
 
     # ------------------------------------------------------------------
+    # Del margen al precio: UNA sola definición, la usan el botón de sugerir
+    # y la columna de margen editable de cada fila.
+    # ------------------------------------------------------------------
+    def _paso_redondeo(self):
+        self.ensure_one()
+        return self.redondeo if self.redondeo > 0 else 0.01
+
+    @staticmethod
+    def precio_desde_margen(costo, margen_pct, paso):
+        """Precio redondeado al múltiplo pedido, nunca por debajo del costo."""
+        if not costo:
+            return 0.0
+        precio = round(costo * (1 + margen_pct / 100.0) / paso) * paso
+        if precio < costo:
+            # el redondeo hacia abajo no puede meterlo bajo costo. Se sube al
+            # múltiplo justo por encima de una vez: subir de paso en paso
+            # daba millones de vueltas con un margen objetivo negativo.
+            precio = math.ceil(costo / paso) * paso
+        return precio
+
     def action_sugerir(self):
-        """Del margen objetivo al precio, redondeado. Nunca por debajo del
-        costo: RB-08 lo rechazaría al aplicar."""
+        """Del margen objetivo al precio, redondeado, en TODAS las filas.
+        Nunca por debajo del costo: RB-08 lo rechazaría al aplicar."""
         self.ensure_one()
         # sin costo no hay margen que aplicar: antes el botón se quedaba
         # callado y parecía averiado (típico en los combos, que no lo llevan)
@@ -129,19 +171,12 @@ class PrecioSugerido(models.TransientModel):
                 'calcular. Ponga el costo en la pestaña «Compra» del producto '
                 'y vuelva a intentarlo; mientras tanto puede teclear los '
                 'precios a mano.'))
-        paso = self.redondeo if self.redondeo > 0 else 0.01
+        paso = self._paso_redondeo()
         for linea in self.linea_ids:
             if not linea.costo_total:
                 continue
-            bruto = linea.costo_total * (1 + self.margen_objetivo / 100.0)
-            sugerido = round(bruto / paso) * paso
-            if sugerido < linea.costo_total:
-                # el redondeo hacia abajo no puede meterlo bajo costo. Se sube
-                # al múltiplo justo por encima del costo de una vez: subir de
-                # paso en paso podía dar millones de vueltas con un margen
-                # objetivo negativo y un redondeo fino.
-                sugerido = math.ceil(linea.costo_total / paso) * paso
-            linea.precio_nuevo = sugerido
+            linea.precio_nuevo = self.precio_desde_margen(
+                linea.costo_total, self.margen_objetivo, paso)
         return self._reabrir()
 
     def action_aplicar(self):
@@ -200,8 +235,12 @@ class PrecioSugeridoLinea(models.TransientModel):
                                  compute='_compute_desde_producto')
     margen_actual = fields.Float(string='Margen actual %',
                                  compute='_compute_desde_producto')
-    margen_nuevo = fields.Float(string='Margen nuevo %',
-                                compute='_compute_margen_nuevo')
+    margen_nuevo = fields.Float(
+        string='Margen nuevo %', compute='_compute_margen_nuevo',
+        inverse='_inverse_margen_nuevo', readonly=False,
+        help='Se puede teclear: escriba el margen y el precio se calcula solo, '
+             'redondeado; o escriba el precio y aquí verá el margen que deja. '
+             'Sirve para dar a Mayor un margen distinto que a Detalle.')
 
     @api.depends('wizard_id.product_tmpl_id', 'lista_id', 'uom_id')
     def _compute_desde_producto(self):
@@ -228,3 +267,15 @@ class PrecioSugeridoLinea(models.TransientModel):
             linea.margen_nuevo = (
                 (linea.precio_nuevo - linea.costo_total) / linea.costo_total * 100
                 if linea.costo_total else 0.0)
+
+    def _inverse_margen_nuevo(self):
+        """El margen tecleado manda el precio. Al redondear, el margen que
+        queda no es exacto —20% sobre 90.00 con múltiplos de 5 da 110.00, o
+        sea 22.2%— y la columna lo vuelve a mostrar: el precio es el maestro
+        y el margen el termómetro, igual que en ADG."""
+        for linea in self:
+            if not linea.costo_total or not linea.wizard_id:
+                continue
+            linea.precio_nuevo = linea.wizard_id.precio_desde_margen(
+                linea.costo_total, linea.margen_nuevo,
+                linea.wizard_id._paso_redondeo())
