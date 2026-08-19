@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_precio_sugerido_form" model="ir.ui.view">
+        <field name="name">surtidora.precio.sugerido.form</field>
+        <field name="model">surtidora.precio.sugerido</field>
+        <field name="arch" type="xml">
+            <form string="Precios y margen">
+                <field name="aviso" invisible="not aviso" readonly="1"
+                       nolabel="1" class="alert alert-warning" role="alert"/>
+                <group>
+                    <group>
+                        <field name="product_tmpl_id"/>
+                        <field name="costo_base"/>
+                        <field name="itbis_pct" string="ITBIS %"/>
+                    </group>
+                    <group>
+                        <field name="margen_objetivo"/>
+                        <field name="redondeo"/>
+                        <button name="action_sugerir" type="object"
+                                string="Sugerir precios" class="btn-secondary"/>
+                    </group>
+                </group>
+                <separator string="Precio por lista y unidad"/>
+                <field name="linea_ids" nolabel="1">
+                    <list editable="bottom" create="false" delete="false">
+                        <field name="lista_id"/>
+                        <field name="uom_id"/>
+                        <field name="factor" optional="hide"/>
+                        <field name="costo_total"/>
+                        <field name="precio_actual"/>
+                        <field name="margen_actual"
+                               optional="show"/>
+                        <field name="precio_nuevo"/>
+                        <field name="margen_nuevo"
+                               decoration-danger="margen_nuevo &lt; 0"
+                               decoration-warning="margen_nuevo &gt;= 0 and margen_nuevo &lt; 5"
+                               decoration-success="margen_nuevo &gt;= 5"/>
+                    </list>
+                </field>
+                <p class="text-muted mt-2">
+                    El precio es el del empaque COMPLETO — «la caja a 880» —;
+                    la conversión a unidad base la hace el sistema. El margen
+                    se calcula sobre el costo con ITBIS, igual que en el
+                    sistema actual. Ningún precio puede quedar por debajo del
+                    costo (regla RB-08).
+                </p>
+                <footer>
+                    <button string="Aplicar" name="action_aplicar" type="object"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_precio_sugerido" model="ir.actions.act_window">
+        <field name="name">Precios y margen</field>
+        <field name="res_model">surtidora.precio.sugerido</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Botón en la ficha NATIVA del producto: no se reemplaza el
+         formulario estándar, solo se le agrega el acceso. -->
+    <record id="view_product_template_form_precios" model="ir.ui.view">
+        <field name="name">product.template.form.precios.surtidora</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="%(action_precio_sugerido)d" type="action"
+                        class="oe_stat_button" icon="fa-tags"
+                        groups="sales_team.group_sale_manager">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Precios y</span>
+                        <span class="o_stat_text">margen</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>
