@@ -15,9 +15,10 @@
                     </group>
                     <group>
                         <field name="margen_objetivo"/>
+                        <field name="descuento_empaque"/>
                         <field name="redondeo"/>
                         <button name="action_sugerir" type="object"
-                                string="Sugerir precios" class="btn-secondary"/>
+                                string="Sugerir desde el costo" class="btn-secondary"/>
                     </group>
                 </group>
                 <separator string="Precio por lista y unidad"/>
@@ -42,8 +43,14 @@
                     se calcula sobre el costo con ITBIS, igual que en el
                     sistema actual, y <b>se puede teclear</b>: escriba el margen
                     y el precio sale solo, redondeado. Así se le da a Mayor un
-                    margen distinto que a Detalle. Ningún precio puede quedar
-                    por debajo del costo (regla RB-08).
+                    margen distinto que a Detalle.
+                    <br/>
+                    <b>Sugerir desde el costo</b> propone toda la tabla sin que
+                    haya que teclear un solo precio: la unidad sale del margen
+                    sobre el costo, y cada empaque de esa unidad menos el
+                    descuento por volumen — que es como se fijan los precios
+                    aquí (el 96% de los empaques del catálogo está puesto así).
+                    Ningún precio puede quedar por debajo del costo (RB-08).
                 </p>
                 <footer>
                     <button string="Aplicar" name="action_aplicar" type="object"

@@ -6,6 +6,12 @@
         <field name="inherit_id" ref="sale.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//block[@id='pricing_setting_container']" position="inside">
+                <setting id="surtidora_sugerencia_precio_setting"
+                         string="Sugerencia de precio desde el costo"
+                         help="Con qué números propone «Precios y margen» un precio partiendo solo del costo. Los valores de arranque son las medianas del propio catálogo: 25% de margen en la unidad y 7% de descuento al llevar el empaque completo.">
+                    <field name="surtidora_margen_unidad_pct"/>
+                    <field name="surtidora_descuento_empaque_pct"/>
+                </setting>
                 <setting id="surtidora_lista_precio_ficha_setting"
                          string="Precio de venta de la ficha"
                          help="Lo que se cobra es el precio de la LISTA. Para que el campo «Precio de venta» de la ficha no muestre un número que nadie cobra, se pone al día con la unidad base de esta lista al mantener precios. Vacío = no se toca.">

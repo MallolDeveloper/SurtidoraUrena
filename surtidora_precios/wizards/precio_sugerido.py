@@ -43,8 +43,17 @@ class PrecioSugerido(models.TransientModel):
     itbis_pct = fields.Float(string='ITBIS %', compute='_compute_cabecera')
     aviso = fields.Text(compute='_compute_cabecera')
     margen_objetivo = fields.Float(
-        string='Margen objetivo %', default=15.0,
-        help='Sobre el costo con ITBIS, igual que en el sistema actual.')
+        string='Margen de la unidad %',
+        default=lambda self: self.env.company.surtidora_margen_unidad_pct,
+        help='Sobre el costo con ITBIS, igual que en el sistema actual. Se '
+             'aplica a la UNIDAD BASE; los empaques salen de ella.')
+    descuento_empaque = fields.Float(
+        string='Descuento por empaque %',
+        default=lambda self: self.env.company.surtidora_descuento_empaque_pct,
+        help='Cuánto más barata sale la unidad al llevar el empaque completo. '
+             'Así se fijan los precios aquí: el 96% de los empaques del '
+             'catálogo está puesto como un descuento sobre el precio unitario, '
+             'no con un margen propio.')
     redondeo = fields.Float(
         string='Redondear a múltiplos de', default=5.0,
         help='El 98% de los precios de la casa son múltiplos de 5.')
@@ -188,11 +197,9 @@ class PrecioSugerido(models.TransientModel):
         return self.redondeo if self.redondeo > 0 else 0.01
 
     @staticmethod
-    def precio_desde_margen(costo, margen_pct, paso):
-        """Precio redondeado al múltiplo pedido, nunca por debajo del costo."""
-        if not costo:
-            return 0.0
-        precio = round(costo * (1 + margen_pct / 100.0) / paso) * paso
+    def _redondear(bruto, costo, paso):
+        """Al múltiplo pedido, nunca por debajo del costo."""
+        precio = round(bruto / paso) * paso
         if precio < costo:
             # el redondeo hacia abajo no puede meterlo bajo costo. Se sube al
             # múltiplo justo por encima de una vez: subir de paso en paso
@@ -200,9 +207,26 @@ class PrecioSugerido(models.TransientModel):
             precio = math.ceil(costo / paso) * paso
         return precio
 
+    @classmethod
+    def precio_desde_margen(cls, costo, margen_pct, paso):
+        """Precio redondeado al múltiplo pedido, nunca por debajo del costo."""
+        if not costo:
+            return 0.0
+        return cls._redondear(costo * (1 + margen_pct / 100.0), costo, paso)
+
     def action_sugerir(self):
-        """Del margen objetivo al precio, redondeado, en TODAS las filas.
-        Nunca por debajo del costo: RB-08 lo rechazaría al aplicar."""
+        """Del COSTO al precio de venta, en todas las filas y de una vez.
+
+        Se hace en dos pasadas porque así se fijan los precios aquí, medido
+        sobre las 30,749 reglas del catálogo: el 96% de los empaques está
+        puesto como un DESCUENTO sobre el precio unitario, no con un margen
+        propio. Es decir, la casa no piensa «qué margen le pongo a la caja»,
+        piensa «la caja sale un 7% más barata por unidad».
+
+        1. La unidad base de cada lista sale del margen sobre el costo.
+        2. Cada empaque sale de esa unidad: precio × factor − descuento.
+
+        Ninguno queda bajo costo, que RB-08 lo rechazaría al aplicar."""
         self.ensure_one()
         # sin costo no hay margen que aplicar: antes el botón se quedaba
         # callado y parecía averiado (típico en los combos, que no lo llevan)
@@ -213,11 +237,26 @@ class PrecioSugerido(models.TransientModel):
                 'y vuelva a intentarlo; mientras tanto puede teclear los '
                 'precios a mano.'))
         paso = self._paso_redondeo()
+        # 1ª pasada: la unidad base de cada lista, por margen sobre el costo
+        unidad_por_lista = {}
         for linea in self.linea_ids:
-            if not linea.costo_total:
+            if linea.factor > 1 or not linea.costo_total:
                 continue
             linea.precio_nuevo = self.precio_desde_margen(
                 linea.costo_total, self.margen_objetivo, paso)
+            linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)
+            unidad_por_lista[linea.lista_id.id] = linea.precio_nuevo
+        # 2ª pasada: cada empaque, a partir de SU unidad y de la misma lista
+        for linea in self.linea_ids:
+            if linea.factor <= 1 or not linea.costo_total:
+                continue
+            unidad = unidad_por_lista.get(linea.lista_id.id)
+            bruto = (unidad * linea.factor * (1 - self.descuento_empaque / 100.0)
+                     if unidad
+                     # sin unidad base en esa lista no hay de dónde colgarlo:
+                     # se cae al margen, que siempre da un número razonable
+                     else linea.costo_total * (1 + self.margen_objetivo / 100.0))
+            linea.precio_nuevo = self._redondear(bruto, linea.costo_total, paso)
             linea.margen_nuevo = linea._margen_de(linea.precio_nuevo)
         return self._reabrir()
 
