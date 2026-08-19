@@ -20,10 +20,13 @@ class PosAutorizacion(models.AbstractModel):
 
     @api.model
     def autorizar_bajo_costo(self, pin, motivo_id, nota, order_ref,
-                             partner_id, lineas):
+                             partner_id, lineas, tipo='rb08'):
         """Valida el PIN del supervisor y registra UNA auditoría por línea.
 
         lineas: [{product_id, precio, precio_lista, cantidad}]
+        tipo:   'rb08' venta bajo costo | 'rb01' rebaja bajo el precio de lista.
+                Va al final y con valor por defecto para que un navegador que
+                todavía tenga el JS viejo siga funcionando.
         Devuelve {ok, autorizador} o {ok: False} si el PIN no corresponde.
         """
         self._verificar_pos_user()
@@ -71,6 +74,7 @@ class PosAutorizacion(models.AbstractModel):
                 'motivo_texto': motivo.name or '',
                 'nota': nota or '',
                 'origen': 'pos',
+                'tipo': 'rb01' if tipo == 'rb01' else 'rb08',
             })
         return {'ok': True, 'autorizador': autorizador.name}
 

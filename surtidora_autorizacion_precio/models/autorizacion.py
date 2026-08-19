@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -52,6 +52,44 @@ class AutorizacionPrecio(models.Model):
     origen = fields.Selection(
         [('backend', 'Cotización'), ('pos', 'Mostrador (POS)')],
         default='backend', string='Origen')
+    # QUÉ regla se saltó. Antes toda fila del mostrador era una excepción de
+    # bajo costo y toda del backend una rebaja bajo lista; ahora las dos
+    # pantallas hacen las dos cosas, y en una auditoría no da igual: una es
+    # una rebaja aprobada y la otra es vender perdiendo dinero.
+    tipo = fields.Selection(
+        [('rb01', 'Bajo el precio de lista'), ('rb08', 'BAJO COSTO')],
+        string='Regla', default='rb01', required=True, index=True)
+    # La fila se escribe al validar el PIN, ANTES de cobrar. Sin esto no había
+    # forma de saber si la venta llegó a existir: hoy la bitácora tiene una
+    # excepción de un pedido cancelado y otra de uno que nunca existió.
+    pos_order_id = fields.Many2one(
+        'pos.order', string='Venta del mostrador', ondelete='set null',
+        help='Se enlaza sola cuando la venta baja del mostrador al servidor.')
+    estado_venta = fields.Selection(
+        [('cobrada', 'Cobrada'), ('en_curso', 'En curso'),
+         ('cancelada', 'CANCELADA'), ('sin_venta', 'SIN VENTA')],
+        string='Estado de la venta', compute='_compute_estado_venta',
+        store=True, index=True,
+        help='Una autorización de una venta cancelada o inexistente no debería '
+             'estar aquí sin que nadie lo note.')
+
+    @api.depends('pos_order_id.state', 'line_id.order_id.state')
+    def _compute_estado_venta(self):
+        for registro in self:
+            if registro.pos_order_id:
+                estado = registro.pos_order_id.state
+                registro.estado_venta = (
+                    'cancelada' if estado == 'cancel'
+                    else 'cobrada' if estado in ('paid', 'done', 'invoiced')
+                    else 'en_curso')
+            elif registro.line_id:
+                estado = registro.line_id.order_id.state
+                registro.estado_venta = (
+                    'cancelada' if estado == 'cancel'
+                    else 'cobrada' if estado in ('sale', 'done')
+                    else 'en_curso')
+            else:
+                registro.estado_venta = 'sin_venta'
 
     # ------------------------------------------------------------------
     # Una bitácora no se edita: es la prueba de quién autorizó qué
@@ -60,8 +98,12 @@ class AutorizacionPrecio(models.Model):
     # ACL daba escritura al Gerente de Ventas, que suele ser el jefe de quien
     # pide las rebajas. Con exportar, cambiar el autorizador y reimportar,
     # la bitácora quedaba alterada sin dejar huella.
+    # `estado_venta` y el enlace a la venta los pone el propio sistema al
+    # sincronizar; lo demás es la prueba y no se toca.
+    _CAMPOS_DEL_SISTEMA = {'estado_venta', 'pos_order_id'}
+
     def write(self, valores):
-        if not self.env.su:
+        if not self.env.su and set(valores) - self._CAMPOS_DEL_SISTEMA:
             raise UserError(_(
                 'La bitácora de autorizaciones no se modifica: es la prueba de '
                 'quién autorizó qué. Si un registro está mal, deje constancia '

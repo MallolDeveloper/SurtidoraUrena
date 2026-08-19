@@ -6,6 +6,9 @@
         <field name="arch" type="xml">
             <list create="false" edit="false" delete="false">
                 <field name="create_date" string="Fecha"/>
+                <field name="tipo" decoration-danger="tipo == 'rb08'"/>
+                <field name="estado_venta"
+                       decoration-danger="estado_venta in ('cancelada', 'sin_venta')"/>
                 <field name="order_ref"/>
                 <field name="partner_id"/>
                 <field name="product_id"/>
@@ -19,6 +22,7 @@
                 <field name="motivo_texto" string="Motivo"/>
                 <field name="motivo_id" optional="hide" string="Motivo (catálogo)"/>
                 <field name="origen" optional="show"/>
+                <field name="pos_order_id" optional="hide"/>
                 <field name="nota" optional="hide"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="company_id" groups="base.group_multi_company" optional="hide"/>
@@ -50,6 +54,12 @@
                 <filter name="mes" string="Este mes"
                         domain="[('create_date', '&gt;=', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d'))]"/>
                 <separator/>
+                <filter name="bajo_costo" string="BAJO COSTO" domain="[('tipo', '=', 'rb08')]"/>
+                <filter name="bajo_lista" string="Bajo lista" domain="[('tipo', '=', 'rb01')]"/>
+                <separator/>
+                <filter name="sin_cobrar" string="Venta cancelada o inexistente"
+                        domain="[('estado_venta', 'in', ['cancelada', 'sin_venta'])]"/>
+                <separator/>
                 <filter name="del_pos" string="Mostrador" domain="[('origen', '=', 'pos')]"/>
                 <filter name="del_backend" string="Cotización" domain="[('origen', '=', 'backend')]"/>
                 <group>
@@ -63,6 +73,8 @@
                             context="{'group_by': 'product_id'}"/>
                     <filter name="g_cliente" string="Cliente"
                             context="{'group_by': 'partner_id'}"/>
+                    <filter name="g_tipo" string="Regla"
+                            context="{'group_by': 'tipo'}"/>
                     <filter name="g_mes" string="Mes"
                             context="{'group_by': 'create_date'}"/>
                 </group>

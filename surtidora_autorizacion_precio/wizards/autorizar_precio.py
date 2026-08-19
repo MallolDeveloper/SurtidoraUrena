@@ -75,6 +75,8 @@ class AutorizarPrecioWizard(models.TransientModel):
                 # después no se pueden reconstruir
                 'costo': line._costo_en_uom(),
                 'motivo_texto': self.motivo_id.name or '',
+                # el asistente rechaza el bajo costo antes de llegar aquí
+                'tipo': 'rb01',
                 'currency_id': line.currency_id.id,
                 'solicitante_id': self.env.user.id,
                 'autorizador_id': autorizador.id,

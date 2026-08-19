@@ -72,6 +72,37 @@ patch(PosOrderline.prototype, {
         return this.price_unit * (1 - (this.getDiscount() || 0) / 100);
     },
 
+    /** Precio que la tarifa del pedido asigna a esta línea, CON su cantidad
+     * y con ITBIS — la misma base que surtiPrecioEfectivoConItbis. */
+    get surtiPrecioTarifa() {
+        try {
+            const tmpl = this.product_id.product_tmpl_id;
+            return tmpl.getPrice(this.order_id.pricelist_id, Math.abs(this.qty) || 1, 0);
+        } catch {
+            return 0;
+        }
+    },
+
+    /** RB-01: ¿se vende por debajo del precio de lista, más allá de la
+     * tolerancia que fije la empresa?
+     *
+     * Esto NO existía en el mostrador: el módulo solo miraba el costo, así
+     * que una cajera podía bajar un artículo de 100.00 a 91.00 sin PIN y sin
+     * dejar rastro — todo lo que quedara por encima del costo pasaba libre,
+     * que es justo donde ocurren las rebajas del día a día. */
+    get surtiBajoLista() {
+        if (this.combo_line_ids?.length || this.qty < 0 || this.refunded_orderline_id) {
+            return false;
+        }
+        const tarifa = this.surtiPrecioTarifa;
+        if (!tarifa) {
+            return false;
+        }
+        const tolerancia = this.company?.surtidora_tolerancia_precio_pct || 0;
+        const piso = tarifa * (1 - tolerancia / 100);
+        return this.surtiPrecioEfectivoConItbis < piso - 0.005;
+    },
+
     /** ¿La línea está por debajo del costo? (pinta el rojo del template)
      *
      * La línea del producto combo es una CABECERA: Odoo la deja en 0.00 y
@@ -99,11 +130,70 @@ patch(PosOrderline.prototype, {
 
 patch(OrderPaymentValidation.prototype, {
     async isOrderValid(isForceValidate) {
-        const pendientes = this._surtiLineasBajoCosto();
-        if (pendientes.length && !(await this._surtiExcepcionBajoCosto(pendientes))) {
+        // Primero la regla dura (bajo costo) y después la de rebaja (bajo
+        // lista). Una línea bajo costo está también bajo lista, así que se
+        // atiende por el camino estricto y no se pregunta dos veces.
+        const bajoCosto = this._surtiLineasBajoCosto();
+        if (bajoCosto.length && !(await this._surtiExcepcionBajoCosto(bajoCosto))) {
+            return false;
+        }
+        const bajoLista = this._surtiLineasBajoLista();
+        if (bajoLista.length && !(await this._surtiAutorizarBajoLista(bajoLista))) {
             return false;
         }
         return await super.isOrderValid(...arguments);
+    },
+
+    /** Líneas bajo lista SIN autorización vigente. Se excluyen las que van
+     * bajo costo: esas ya pasaron por la compuerta estricta. */
+    _surtiLineasBajoLista() {
+        const ok = this.order.uiState.surtiBajoListaOk || {};
+        return this.order.lines.filter(
+            (linea) =>
+                linea.surtiBajoLista &&
+                !linea.surtiBajoCosto &&
+                !(ok[linea.uuid] !== undefined &&
+                    linea.surtiPrecioEfectivoConItbis >= ok[linea.uuid] - 0.005)
+        );
+    },
+
+    /** RB-01 en el mostrador: motivo del catálogo + PIN. Sin la alarma roja
+     * ni la doble confirmación del bajo costo — esto es una rebaja aprobada,
+     * no vender perdiendo dinero. */
+    async _surtiAutorizarBajoLista(lineas) {
+        const dialog = this.pos.dialog;
+        const fmt = (v) => this.pos.env.utils.formatCurrency(v);
+        const detalle = lineas
+            .map((l) => `• ${l.product_id.display_name}: ${fmt(l.surtiPrecioEfectivoConItbis)} ` +
+                `${_t("(lista")} ${fmt(l.surtiPrecioTarifa)})`)
+            .join("
+");
+        const abrir = await ask(dialog, {
+            title: _t("Precio por debajo de la lista"),
+            body: _t("Estas líneas van por debajo del precio de lista:
+
+%s
+
+" +
+                "Un supervisor debe autorizarlas con su PIN.", detalle),
+            confirmLabel: _t("Autorizar..."),
+            cancelLabel: _t("Corregir la venta"),
+        });
+        if (!abrir) {
+            return false;
+        }
+        const resultado = await this._surtiMotivoPinYRegistro(lineas, "rb01");
+        if (!resultado) {
+            return false;
+        }
+        const ok = this.order.uiState.surtiBajoListaOk || {};
+        for (const linea of lineas) {
+            ok[linea.uuid] = linea.surtiPrecioEfectivoConItbis;
+        }
+        this.order.uiState.surtiBajoListaOk = ok;
+        this.pos.notification.add(
+            _t("Precio autorizado por %s", resultado.autorizador), { type: "success" });
+        return true;
     },
 
     /** Líneas bajo costo SIN autorización vigente (si el precio bajó más
@@ -139,82 +229,8 @@ patch(OrderPaymentValidation.prototype, {
             return false;
         }
 
-        // 2. Motivo del catálogo (punto 6: se elige, no se escribe)
-        let motivos;
-        try {
-            motivos = await this.pos.data.call("surtidora.pos.autorizacion", "motivos", []);
-        } catch (error) {
-            dialog.add(AlertDialog, this._surtiMotivoDelFallo(error));
-            return false;
-        }
-        if (!motivos.length) {
-            // ojo: esto ya NO es un problema de conexión — el servidor
-            // contestó y dijo que no hay motivos cargados
-            dialog.add(AlertDialog, {
-                title: _t("Sin motivos configurados"),
-                body: _t("El catálogo de motivos de descuento está vacío, y sin " +
-                    "motivo no se puede autorizar una venta bajo costo. Pida a un " +
-                    "administrador que cargue el catálogo."),
-            });
-            return false;
-        }
-        const motivo = await makeAwaitable(dialog, SelectionPopup, {
-            title: _t("Motivo de la excepción"),
-            list: motivos.map((m) => ({ id: m.id, label: m.nombre, item: m })),
-        });
-        if (!motivo) {
-            return false;
-        }
-
-        // 3. PIN del supervisor (enmascarado; se valida en el servidor)
-        const pin = await makeAwaitable(dialog, NumberPopup, {
-            title: _t("PIN del supervisor"),
-            formatDisplayedValue: (v) => "•".repeat(String(v).length),
-        });
-        if (!pin) {
-            return false;
-        }
-
-        // 4. Doble confirmación — el "¿estás seguro?" que pidió Adelso
-        const seguro = await ask(dialog, {
-            title: _t("¿Está seguro?"),
-            body: _t('Se venderá BAJO COSTO por "%s". Quedará registrado ' +
-                "a nombre del supervisor que autoriza.", motivo.nombre),
-            confirmLabel: _t("Sí, autorizar"),
-            cancelLabel: _t("No"),
-        });
-        if (!seguro) {
-            return false;
-        }
-
-        // 5. Validación del PIN + auditoría, en una sola llamada
-        let resultado;
-        try {
-            resultado = await this.pos.data.call(
-                "surtidora.pos.autorizacion", "autorizar_bajo_costo", [
-                    String(pin),
-                    motivo.id,
-                    "",
-                    this.order.pos_reference || this.order.name || "",
-                    this.order.getPartner()?.id || false,
-                    lineas.map((l) => ({
-                        product_id: l.product_id.id,
-                        precio: l.surtiPrecioEfectivoConItbis,
-                        precio_lista: this._surtiPrecioLista(l),
-                        cantidad: l.qty,
-                    })),
-                ]);
-        } catch (error) {
-            dialog.add(AlertDialog, this._surtiMotivoDelFallo(error));
-            return false;
-        }
-        if (!resultado.ok) {
-            dialog.add(AlertDialog, resultado.mensaje
-                ? { title: _t("Autorización bloqueada"), body: resultado.mensaje }
-                : {
-                    title: _t("PIN incorrecto"),
-                    body: _t("El PIN no corresponde a ningún autorizador de precios."),
-                });
+        const resultado = await this._surtiMotivoPinYRegistro(lineas, "rb08");
+        if (!resultado) {
             return false;
         }
 
@@ -227,6 +243,102 @@ patch(OrderPaymentValidation.prototype, {
             _t("Excepción bajo costo autorizada por %s", resultado.autorizador),
             { type: "success" });
         return true;
+    },
+
+    /** Motivo del catálogo + PIN del supervisor + registro en la bitácora.
+     *
+     * Lo comparten las dos reglas: cambia el aviso previo y el rigor, no el
+     * trámite. Devuelve el resultado del servidor, o null si el cajero se
+     * echó atrás o algo falló (y en ese caso ya se le explicó por qué).
+     *
+     * `tipo` viaja al servidor para que la bitácora distinga una rebaja
+     * aprobada de una venta perdiendo dinero. */
+    async _surtiMotivoPinYRegistro(lineas, tipo) {
+        const dialog = this.pos.dialog;
+
+        // 1. Motivo del catálogo (punto 6: se elige, no se escribe)
+        let motivos;
+        try {
+            motivos = await this.pos.data.call("surtidora.pos.autorizacion", "motivos", []);
+        } catch (error) {
+            dialog.add(AlertDialog, this._surtiMotivoDelFallo(error));
+            return null;
+        }
+        if (!motivos.length) {
+            // ojo: esto ya NO es un problema de conexión — el servidor
+            // contestó y dijo que no hay motivos cargados
+            dialog.add(AlertDialog, {
+                title: _t("Sin motivos configurados"),
+                body: _t("El catálogo de motivos de descuento está vacío, y sin " +
+                    "motivo no se puede autorizar. Pida a un administrador que " +
+                    "cargue el catálogo."),
+            });
+            return null;
+        }
+        const motivo = await makeAwaitable(dialog, SelectionPopup, {
+            title: _t("Motivo"),
+            list: motivos.map((m) => ({ id: m.id, label: m.nombre, item: m })),
+        });
+        if (!motivo) {
+            return null;
+        }
+
+        // 2. PIN del supervisor (enmascarado; se valida en el servidor)
+        const pin = await makeAwaitable(dialog, NumberPopup, {
+            title: _t("PIN del supervisor"),
+            formatDisplayedValue: (v) => "•".repeat(String(v).length),
+        });
+        if (!pin) {
+            return null;
+        }
+
+        // 3. Doble confirmación — solo para bajo costo, que fue lo que pidió
+        //    Adelso. Pedirla también para una rebaja normal sería ruido.
+        if (tipo === "rb08") {
+            const seguro = await ask(dialog, {
+                title: _t("¿Está seguro?"),
+                body: _t('Se venderá BAJO COSTO por "%s". Quedará registrado ' +
+                    "a nombre del supervisor que autoriza.", motivo.nombre),
+                confirmLabel: _t("Sí, autorizar"),
+                cancelLabel: _t("No"),
+            });
+            if (!seguro) {
+                return null;
+            }
+        }
+
+        // 4. Validación del PIN + auditoría, en una sola llamada
+        let resultado;
+        try {
+            resultado = await this.pos.data.call(
+                "surtidora.pos.autorizacion", "autorizar_bajo_costo", [
+                    String(pin),
+                    motivo.id,
+                    "",
+                    this.order.pos_reference || this.order.name || "",
+                    this.order.getPartner()?.id || false,
+                    lineas.map((l) => ({
+                        product_id: l.product_id.id,
+                        precio: l.surtiPrecioEfectivoConItbis,
+                        precio_lista: l.surtiPrecioTarifa,
+                        cantidad: l.qty,
+                    })),
+                    tipo,
+                ]);
+        } catch (error) {
+            dialog.add(AlertDialog, this._surtiMotivoDelFallo(error));
+            return null;
+        }
+        if (!resultado.ok) {
+            dialog.add(AlertDialog, resultado.mensaje
+                ? { title: _t("Autorización bloqueada"), body: resultado.mensaje }
+                : {
+                    title: _t("PIN incorrecto"),
+                    body: _t("El PIN no corresponde a ningún autorizador de precios."),
+                });
+            return null;
+        }
+        return resultado;
     },
 
     /** Por qué falló la llamada, dicho en cristiano.
@@ -266,18 +378,4 @@ patch(OrderPaymentValidation.prototype, {
         };
     },
 
-    /** Precio de tarifa de la línea, con SU cantidad.
-     *
-     * Preguntar siempre por cantidad 1 falseaba la rebaja en cuanto había
-     * reglas por volumen: una caja de 18 se comparaba contra el precio de un
-     * paquete suelto, y la bitácora registraba un descuento que no fue. El
-     * backend ya lo hace bien (pasa product_uom_qty a _get_product_price). */
-    _surtiPrecioLista(linea) {
-        try {
-            const tmpl = linea.product_id.product_tmpl_id;
-            return tmpl.getPrice(this.order.pricelist_id, Math.abs(linea.qty) || 1, 0);
-        } catch {
-            return 0;
-        }
-    },
 });
