@@ -201,10 +201,13 @@ class PrecioSugerido(models.TransientModel):
         } for l in self.linea_ids
             if l.lista_id and l.uom_id and l.precio_nuevo
             and abs(l.precio_nuevo - l.precio_actual) >= 0.01]
-        if not cambios:
-            raise UserError(_('No hay ningún precio modificado.'))
+        # no se corta aquí aunque no haya precios tocados: puede que lo único
+        # desfasado sea el «Precio de venta» de la ficha, y ponerlo al día es
+        # trabajo válido. El motor cuenta ese ajuste como un cambio más.
         resultado = self.env['surtidora.precios.motor'].guardar_json(
             self.product_tmpl_id.id, cambios)
+        if not resultado['cambios']:
+            raise UserError(_('No hay ningún precio modificado.'))
         mensaje = _('%s precio(s) actualizados.') % resultado['cambios']
         if resultado.get('avisos'):
             mensaje += '\n' + '\n'.join(resultado['avisos'])
