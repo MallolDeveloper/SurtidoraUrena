@@ -67,7 +67,24 @@ class PrecioSugerido(models.TransientModel):
                                 'margen que calcular ni piso que respetar.'))
             # el campo «Precio de venta» de la ficha no es lo que se cobra:
             # si va por su cuenta, la ficha enseña un número que nadie cobra
-            if datos['lista_ficha'] and datos['precio_ficha_lista'] and abs(
+            if datos['lista_ficha'] and not datos['precio_ficha_lista']:
+                # sin NINGUNA regla, la tabla sale en 0.00 pero el producto sí
+                # se vende: la caja cae al precio de la ficha. Callarlo hacía
+                # creer que el producto no tiene precio.
+                if datos['precio_ficha']:
+                    avisos.append(_(
+                        'Este producto no tiene ninguna regla de precio, así '
+                        'que la tabla sale en 0.00: hoy el mostrador cobra los '
+                        '%(ficha).2f del «Precio de venta» de la ficha, igual '
+                        'en las cuatro listas. Si fija precios aquí, pasarán a '
+                        'mandar ellos y la ficha los seguirá.',
+                        ficha=datos['precio_ficha']))
+                else:
+                    avisos.append(_(
+                        'Este producto no tiene precio en ninguna parte: ni '
+                        'reglas de lista ni «Precio de venta» en la ficha. '
+                        'Tal como está, el mostrador no puede venderlo.'))
+            elif datos['lista_ficha'] and abs(
                     datos['precio_ficha'] - datos['precio_ficha_lista']) >= 0.01:
                 avisos.append(_(
                     'El «Precio de venta» de la ficha dice %(ficha).2f pero '
