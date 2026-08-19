@@ -29,28 +29,30 @@
     <!-- Sin esto la barra de búsqueda solo entiende números de registro:
          Odoo genera un search por defecto con el id, así que buscar "Adelso"
          no devolvía nada. Es la pantalla con la que se va a auditar. -->
+    <!-- Sin esto la barra de búsqueda solo entiende números de registro:
+         Odoo genera un search por defecto con el id, así que buscar "Adelso"
+         no devolvía nada. Es la pantalla con la que se va a auditar.
+         OJO: el <group> del "Agrupar por" va SIN atributos — el validador de
+         Odoo 19 rechaza expand y string ahí (ya nos pasó con otra vista). -->
     <record id="view_autorizacion_precio_search" model="ir.ui.view">
         <field name="name">surtidora.autorizacion.precio.search</field>
         <field name="model">surtidora.autorizacion.precio</field>
         <field name="arch" type="xml">
             <search string="Autorizaciones de precio">
-                <field name="autorizador_id"/>
-                <field name="solicitante_id"/>
+                <field name="autorizador_id" string="Autorizó"/>
+                <field name="solicitante_id" string="Pidió"/>
                 <field name="product_id"/>
                 <field name="partner_id"/>
                 <field name="order_ref"/>
-                <field name="motivo_texto"/>
+                <field name="motivo_texto" string="Motivo"/>
                 <filter name="hoy" string="Hoy"
-                        domain="[('create_date', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0,0,0)))]"/>
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
                 <filter name="mes" string="Este mes"
                         domain="[('create_date', '&gt;=', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d'))]"/>
-                <filter name="mes_pasado" string="Mes pasado"
-                        domain="[('create_date', '&gt;=', (context_today() + relativedelta(months=-1, day=1)).strftime('%Y-%m-%d')),
-                                 ('create_date', '&lt;', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d'))]"/>
                 <separator/>
                 <filter name="del_pos" string="Mostrador" domain="[('origen', '=', 'pos')]"/>
                 <filter name="del_backend" string="Cotización" domain="[('origen', '=', 'backend')]"/>
-                <group expand="0" string="Agrupar por">
+                <group>
                     <filter name="g_autorizador" string="Autorizó"
                             context="{'group_by': 'autorizador_id'}"/>
                     <filter name="g_solicitante" string="Pidió"
@@ -62,7 +64,7 @@
                     <filter name="g_cliente" string="Cliente"
                             context="{'group_by': 'partner_id'}"/>
                     <filter name="g_mes" string="Mes"
-                            context="{'group_by': 'create_date:month'}"/>
+                            context="{'group_by': 'create_date'}"/>
                 </group>
             </search>
         </field>
