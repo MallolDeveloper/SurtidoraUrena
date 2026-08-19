@@ -51,12 +51,23 @@ class PreciosMotor(models.AbstractModel):
                     'precio_total': round(regla.fixed_price * u['factor'], 2) if regla else 0.0,
                     'costo_total_itbis': costo_total,
                 })
+        lista_ficha = self.env.company.surtidora_lista_precio_ficha
+        precio_ficha_lista = 0.0
+        if lista_ficha:
+            r = reglas.get(self._clave(lista_ficha.id, 1.0))
+            precio_ficha_lista = round(r.fixed_price, 2) if r else 0.0
         return {
             'template_id': tmpl.id,
             'ref': tmpl.default_code or '',
             'nombre': tmpl.name,
             'costo_base': tmpl.standard_price,
             'itbis_pct': itbis * 100,
+            # el campo "Precio de venta" de la ficha y lo que dice la lista
+            # que lo gobierna: si no cuadran, la ficha muestra un numero que
+            # nadie cobra (la caja va por la lista)
+            'lista_ficha': lista_ficha.name if lista_ficha else '',
+            'precio_ficha': tmpl.list_price,
+            'precio_ficha_lista': precio_ficha_lista,
             'unidades': unidades,
             'filas': filas,
             # reglas que esta pantalla NO edita (variantes, promos con fecha,
@@ -119,6 +130,12 @@ class PreciosMotor(models.AbstractModel):
                 lista=c.get('lista', lista_id), unidad=unidad,
                 antes=('%.2f' % anterior) if anterior is not None else _('(nuevo)'),
                 ahora=total))
+        ficha = self._sincronizar_precio_ficha(tmpl)
+        if ficha:
+            bitacora.append(_(
+                'Precio de venta de la ficha: %(antes).2f → %(ahora).2f '
+                '(sigue a %(lista)s)',
+                antes=ficha[0], ahora=ficha[1], lista=ficha[2]))
         if bitacora:
             titulo = _('Mantenimiento de precios por %s:', self.env.user.name)
             cuerpo = Markup('<br/>').join(
@@ -129,6 +146,30 @@ class PreciosMotor(models.AbstractModel):
     # ------------------------------------------------------------------
     # Piezas
     # ------------------------------------------------------------------
+    def _sincronizar_precio_ficha(self, tmpl):
+        """Pone al día el campo «Precio de venta» de la ficha.
+
+        Lo que se cobra es el precio de la LISTA; ese campo solo entra cuando
+        el producto no tiene regla en la lista activa. Si se queda atrás, la
+        ficha enseña un número que nadie cobra — pasó con GALLETAS DE PRUEBAS,
+        que decía 450.00 mientras la caja cobraba los 6.00 de la lista.
+
+        Qué lista lo gobierna es configuración (Ventas → Precio de venta de la
+        ficha); vacío = no se toca. Devuelve (antes, ahora, lista) o None."""
+        lista = self.env.company.surtidora_lista_precio_ficha
+        if not lista:
+            return None
+        reglas, _e = self._reglas_por_clave(tmpl)  # releído: ya se escribió
+        regla = reglas.get(self._clave(lista.id, 1.0))
+        if not regla:
+            return None
+        nuevo = round(regla.fixed_price, 2)
+        anterior = tmpl.list_price or 0.0
+        if abs(anterior - nuevo) < 0.01:
+            return None
+        tmpl.list_price = nuevo
+        return anterior, nuevo, lista.name
+
     def _verificar_grupo(self):
         if not self.env.user.has_group(_GRUPO):
             raise AccessError(_('Solo gerentes de ventas mantienen precios.'))

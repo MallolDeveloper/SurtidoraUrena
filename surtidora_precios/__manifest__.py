@@ -27,13 +27,14 @@ cubre solo esos dos huecos, SIN reemplazar nada del estándar: agrega un botón
 Fórmula (deducida de 3,000 precios reales de ADG):
     precio = costo sin ITBIS × factor × (1 + ITBIS) × (1 + margen)
     """,
-    'version': '19.0.2.2.0',
+    'version': '19.0.3.0.0',
     'category': 'Sales/Sales',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
     'depends': ['product', 'sale_management'],
     'data': [
         'security/ir.model.access.csv',
+        'views/res_config_settings_views.xml',
         'views/precio_sugerido_views.xml',
     ],
     'installable': True,

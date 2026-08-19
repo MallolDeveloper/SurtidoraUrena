@@ -65,6 +65,16 @@ class PrecioSugerido(models.TransientModel):
             if not datos['costo_base']:
                 avisos.append(_('El producto no tiene costo: sin costo no hay '
                                 'margen que calcular ni piso que respetar.'))
+            # el campo «Precio de venta» de la ficha no es lo que se cobra:
+            # si va por su cuenta, la ficha enseña un número que nadie cobra
+            if datos['lista_ficha'] and datos['precio_ficha_lista'] and abs(
+                    datos['precio_ficha'] - datos['precio_ficha_lista']) >= 0.01:
+                avisos.append(_(
+                    'El «Precio de venta» de la ficha dice %(ficha).2f pero '
+                    '%(lista)s cobra %(real).2f, y lo que se cobra es la lista. '
+                    'Al aplicar se pondrá al día la ficha.',
+                    ficha=datos['precio_ficha'], lista=datos['lista_ficha'],
+                    real=datos['precio_ficha_lista']))
             escalera = wizard._describir_escalera(datos['filas'])
             if escalera:
                 avisos.append(_(
