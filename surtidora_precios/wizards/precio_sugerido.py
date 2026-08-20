@@ -159,6 +159,15 @@ class PrecioSugerido(models.TransientModel):
                     'antes de fijar precios.',
                     base=base.name, factor=base.relative_factor,
                     padre=base.relative_uom_id.name or ''))
+            sin_empaque = wizard._empaques_sin_precio(datos['filas'])
+            if sin_empaque:
+                avisos.append(_(
+                    'Estos empaques NO tienen precio propio: %s. El mostrador '
+                    'cobrará el precio suelto multiplicado por el factor, sin '
+                    'ahorro por llevarse la caja — y el cliente no verá ningún '
+                    'argumento para comprarla. Ponga precio a esas filas o '
+                    'pulse «Sugerir desde el costo», que las llena todas.'
+                ) % sin_empaque)
             if datos.get('fraccionadas'):
                 avisos.append(_(
                     'Este producto tiene %s regla(s) de precio por cantidades '
@@ -181,6 +190,23 @@ class PrecioSugerido(models.TransientModel):
                     'editan desde la lista de precios.')
                     % datos['reglas_extra'])
             wizard.aviso = '\n'.join(avisos)
+
+    @staticmethod
+    def _empaques_sin_precio(filas):
+        """Empaques que se quedaron sin regla propia mientras el suelto sí la
+        tiene.
+
+        Es el error silencioso más fácil de cometer en un producto nuevo: se
+        pone precio a la unidad, se deja la fila de la caja en 0.00 y el
+        mostrador acaba cobrando 36 x el suelto. Ni ahorro, ni argumento de
+        venta. En el catálogo migrado 3,431 productos SÍ tienen ese ahorro,
+        así que un producto nuevo sin él desentona."""
+        base_por_lista = {f['lista_id']: f['precio_total']
+                          for f in filas if f['factor'] <= 1}
+        faltan = ['%s / %s' % (f['lista'], f['unidad']) for f in filas
+                  if f['factor'] > 1 and not f['precio_total']
+                  and base_por_lista.get(f['lista_id'])]
+        return '; '.join(faltan)
 
     @staticmethod
     def _describir_escalera(filas):
