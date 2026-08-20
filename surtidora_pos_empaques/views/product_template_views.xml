@@ -7,6 +7,11 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='categ_id']" position="after">
                 <field name="surtidora_caja_fraccionable"/>
+                <field name="surtidora_aviso_fraccion" invisible="1"/>
+                <div class="alert alert-warning" role="alert" colspan="2"
+                     invisible="not surtidora_aviso_fraccion">
+                    <field name="surtidora_aviso_fraccion" nolabel="1" readonly="1"/>
+                </div>
             </xpath>
         </field>
     </record>

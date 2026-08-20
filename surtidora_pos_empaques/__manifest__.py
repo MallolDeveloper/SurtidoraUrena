@@ -17,7 +17,7 @@ líneas se venden en empaques — dato real de la operación):
 Notas: la línea queda expresada en unidad base (18 Paquete a 48.89 = 880), que
 es como el POS de Odoo modela internamente; el ticket cuadra al centavo.
     """,
-    'version': '19.0.1.4.0',
+    'version': '19.0.1.5.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
