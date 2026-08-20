@@ -41,6 +41,11 @@
                                 invisible="empaque_cantidad &lt;= 1"/>
                     </group>
                 </group>
+                <field name="empaque_vista_previa" invisible="1"/>
+                <div class="alert alert-info" role="alert"
+                     invisible="not empaque_vista_previa">
+                    <field name="empaque_vista_previa" nolabel="1" readonly="1"/>
+                </div>
                 <separator string="Precio por lista y unidad"/>
                 <field name="linea_ids" nolabel="1">
                     <list editable="bottom" create="false" delete="false">

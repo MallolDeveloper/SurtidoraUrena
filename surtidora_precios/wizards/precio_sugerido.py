@@ -72,10 +72,40 @@ class PrecioSugerido(models.TransientModel):
     # a la ficha, crear la unidad de medida y volver. Se declara aquí, que
     # es donde uno está pensando en «la unidad a 5 y el paquete de 25 a 100».
     empaque_nombre = fields.Char(string='Empaque', default='Paquete')
+    empaque_vista_previa = fields.Char(compute='_compute_empaque_vista_previa')
     empaque_cantidad = fields.Float(
         string='Trae cuántas unidades', digits=(16, 2),
         help='Cuántas unidades base entran en el empaque. Un paquete de 25 '
              'unidades: 25.')
+
+    @api.depends('product_tmpl_id', 'empaque_nombre', 'empaque_cantidad')
+    def _compute_empaque_vista_previa(self):
+        """Qué se va a crear exactamente, ANTES de crearlo.
+
+        Sin esto se puede armar un disparate sin enterarse: pasó de verdad con
+        un producto cuya unidad base era «Caja de 36 (Paquete)». Al pedir un
+        empaque «Paquete» de 36 se creó «Paquete de 36 (Caja de 36)», que son
+        36 CAJAS — 1,296 paquetes. El código hizo lo que se le pidió; nadie
+        avisó de lo que eso significaba."""
+        for wizard in self:
+            base = wizard.product_tmpl_id.uom_id
+            partes = []
+            if base and base.relative_factor and base.relative_factor > 1:
+                partes.append(_(
+                    '⚠ La unidad base de este producto YA es un empaque: «%(base)s» '
+                    'son %(factor)g × %(padre)s. La unidad base debe ser lo que se '
+                    'vende SUELTO. Lo que agregue aquí colgará de esa caja, no del '
+                    'artículo suelto.',
+                    base=base.name, factor=base.relative_factor,
+                    padre=base.relative_uom_id.name or ''))
+            if base and wizard.empaque_cantidad > 1:
+                partes.append(_(
+                    'Se creará «%(nombre)s», que son %(cantidad)g × %(base)s.',
+                    nombre='%s de %g (%s)' % (
+                        (wizard.empaque_nombre or 'Paquete').strip(),
+                        wizard.empaque_cantidad, base.name),
+                    cantidad=wizard.empaque_cantidad, base=base.name))
+            wizard.empaque_vista_previa = '\n'.join(partes)
 
     @api.depends('product_tmpl_id')
     def _compute_cabecera(self):
@@ -119,6 +149,16 @@ class PrecioSugerido(models.TransientModel):
                     'Al aplicar se pondrá al día la ficha.',
                     ficha=datos['precio_ficha'], lista=datos['lista_ficha'],
                     real=datos['precio_ficha_lista']))
+            base = wizard.product_tmpl_id.uom_id
+            if base.relative_factor and base.relative_factor > 1:
+                avisos.append(_(
+                    'La unidad base de este producto es «%(base)s», que ya es un '
+                    'empaque de %(factor)g × %(padre)s. Todos los precios de abajo '
+                    'se entienden POR ESA CAJA, no por el artículo suelto. Si no '
+                    'era la intención, corrija la unidad de medida en la ficha '
+                    'antes de fijar precios.',
+                    base=base.name, factor=base.relative_factor,
+                    padre=base.relative_uom_id.name or ''))
             if datos.get('fraccionadas'):
                 avisos.append(_(
                     'Este producto tiene %s regla(s) de precio por cantidades '
