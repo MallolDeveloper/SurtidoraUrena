@@ -196,7 +196,18 @@ class PurchaseOrder(models.Model):
 
     def _surtidora_ultima_por_suplidor(self, lineas, ordenes):
         """{product_id: {partner_id: (orden, linea)}} con la compra más
-        reciente de cada par producto+suplidor."""
+        reciente de cada par producto+suplidor.
+
+        El desempate por `id` NO es cosmético. Con dos compras del mismo día
+        —BOKA15 tiene dos, una a 133.00 la funda y otra que sale a 112.72—
+        comparar solo por fecha deja ganar a la que el ORM devuelva primero, y
+        la tarjeta enseña un precio u otro según el orden de la consulta.
+
+        Y va a ser el caso normal, no la excepción: el histórico que traiga el
+        ETL de ADG casi seguro llegue con la fecha a las 00:00:00, así que
+        todas las compras de un mismo día empatarían. A igualdad de fecha gana
+        la línea de id mayor, que es la que se creó después.
+        """
         ultimas = {}
         for linea in lineas:
             orden = ordenes.get(linea['order_id'][0])
@@ -206,10 +217,16 @@ class PurchaseOrder(models.Model):
                 continue
             del_producto = ultimas.setdefault(linea['product_id'][0], {})
             previa = del_producto.get(linea['partner_id'][0])
-            if previa and previa[0]['date_approve'] >= orden['date_approve']:
+            if previa and self._surtidora_orden_de_reciente(*previa) >= \
+                    self._surtidora_orden_de_reciente(orden, linea):
                 continue
             del_producto[linea['partner_id'][0]] = (orden, linea)
         return ultimas
+
+    @staticmethod
+    def _surtidora_orden_de_reciente(orden, linea):
+        """Con qué criterio se decide cuál compra es "la última"."""
+        return (orden['date_approve'], linea['id'])
 
     # ------------------------------------------------------------------
     # Conversiones
