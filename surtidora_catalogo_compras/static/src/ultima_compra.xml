@@ -11,12 +11,14 @@
         cantidad): colgarse de ahí es lo que el core ya hace.
 
         Se hereda la plantilla COMPARTIDA con el catálogo de ventas a propósito:
-        allí el servidor nunca manda estos datos, el t-if no se cumple y no se
-        dibuja nada.
+        allí el servidor nunca manda estos datos, los t-if no se cumplen y no
+        se dibuja nada.
     -->
     <t t-name="surtidora_catalogo_compras.UltimaCompra"
        t-inherit="product.ProductCatalogOrderLine" t-inherit-mode="extension">
         <xpath expr="//t[@t-portal]" position="after">
+
+            <!-- Lo que le pagamos a ESTE suplidor la última vez -->
             <div t-if="props.surtidoraUltimaFecha"
                  class="o_surtidora_ultima_compra text-muted small px-2 pb-1">
                 <i class="fa fa-history me-1" role="img" aria-label="Última compra"/>
@@ -28,6 +30,36 @@
                     / <t t-out="props.surtidoraUltimaUnidad"/>
                 </span>
             </div>
+
+            <!-- Quién más lo ha vendido, y a cuánto: para negociar -->
+            <div t-foreach="props.surtidoraOtrosSuplidores or []" t-as="otro"
+                 t-key="otro_index"
+                 class="o_surtidora_otro_suplidor text-muted small px-2 pb-1">
+                <i class="fa fa-truck me-1" role="img" aria-label="Otro suplidor"/>
+                <span t-out="otro.suplidor"/>
+                <span class="mx-1">·</span>
+                <span t-out="otro.fecha"/>
+                <span class="mx-1">·</span>
+                <span class="fw-bold" t-out="otro.precio"/>
+            </div>
+
+            <!--
+                El costo de la ficha SOLO cuando no cuadra con la tarifa. En
+                Surtidora coinciden al centavo en 3,737 de 3,755 tarifas, así
+                que enseñarlo siempre sería repetir el número de arriba;
+                cuando NO coinciden casi siempre es un dato malo, y eso hay
+                que verlo antes de firmar la compra.
+            -->
+            <div t-if="props.surtidoraCosto"
+                 class="o_surtidora_costo text-warning small px-2 pb-1">
+                <i class="fa fa-exclamation-triangle me-1" role="img" aria-label="Aviso"/>
+                <span>Costo en ficha </span>
+                <span class="fw-bold" t-out="props.surtidoraCosto"/>
+                <span t-if="props.surtidoraCostoUnidad">
+                    / <t t-out="props.surtidoraCostoUnidad"/>
+                </span>
+            </div>
+
         </xpath>
     </t>
 

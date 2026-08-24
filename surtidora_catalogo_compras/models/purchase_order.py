@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
-"""La última compra a ESE suplidor, en la tarjeta del catálogo.
+"""Lo que hace falta saber de un producto ANTES de pedirlo, en su tarjeta.
+
+Odoo enseña el precio de la tarifa: lo que el suplidor pide hoy. Este módulo
+añade las tres cosas que se miran para decidir si ese precio es bueno:
+
+    · cuándo y a cuánto se le compró por última vez A ESE suplidor
+    · qué otros suplidores lo han vendido, y a cuánto
+    · el costo de la ficha, PERO solo si no coincide con la tarifa
 
 El catálogo pide los datos de las tarjetas visibles en UNA sola llamada a
 `_get_product_catalog_order_line_info`, que recibe el lote completo. Por eso
@@ -23,6 +30,11 @@ from odoo.tools.misc import format_amount, format_date
 # una compra: el precio todavía se está negociando y nadie pagó nada.
 _ESTADOS_COMPRADOS = ('purchase', 'done')
 
+# Cuántos suplidores alternativos caben en la tarjeta sin volverla ilegible.
+# No es un límite de datos sino de espacio: el histórico completo ya se ve en
+# la ficha del producto.
+_OTROS_SUPLIDORES_MAX = 2
+
 
 class PurchaseOrder(models.Model):
     _inherit = 'purchase.order'
@@ -31,58 +43,182 @@ class PurchaseOrder(models.Model):
         datos = super()._get_product_catalog_order_line_info(
             product_ids, child_field=child_field, **kwargs)
         productos = self.env['product.product'].browse(product_ids).exists()
-        for producto_id, ultima in self._surtidora_ultima_compra(productos, datos).items():
+        for producto_id, extra in self._surtidora_datos_de_compra(productos, datos).items():
             if producto_id in datos:
-                datos[producto_id].update(ultima)
+                datos[producto_id].update(extra)
         return datos
 
     # ------------------------------------------------------------------
-    def _surtidora_ultima_compra(self, products, datos_nativos):
-        """{product_id: {surtidoraUltimaFecha, surtidoraUltimoPrecio, surtidoraUltimaUnidad}}."""
+    # Orquestación
+    # ------------------------------------------------------------------
+    def _surtidora_datos_de_compra(self, products, datos_nativos):
+        """{product_id: {...}} con todo lo que este módulo añade a la tarjeta."""
         # En una orden nueva todavía no hay suplidor, y sin suplidor esto no
         # significa nada: la gracia es "cuánto le pagué A ÉL".
         if len(self) != 1 or not self.partner_id or not products:
             return {}
 
         lineas = self._surtidora_lineas_compradas(products)
-        if not lineas:
-            return {}
-        ordenes = self._surtidora_ordenes_de(lineas)
+        ordenes = self._surtidora_ordenes_de(lineas) if lineas else {}
+        ultimas = self._surtidora_ultima_por_suplidor(lineas, ordenes)
+        unidades = self._surtidora_unidad_de_la_tarjeta(products, datos_nativos)
 
+        resultado = {}
+        for producto in products:
+            nombre_unidad, unidades_base = unidades[producto.id]
+            ficha = {}
+            ficha.update(self._surtidora_ultima_compra(
+                producto, ultimas.get(producto.id, {}), unidades_base, nombre_unidad))
+            ficha.update(self._surtidora_otros_suplidores(
+                producto, ultimas.get(producto.id, {}), unidades_base))
+            ficha.update(self._surtidora_costo_discrepante(
+                producto, unidades_base, nombre_unidad,
+                datos_nativos.get(producto.id) or {}))
+            if ficha:
+                resultado[producto.id] = ficha
+        return resultado
+
+    # ------------------------------------------------------------------
+    # Los tres datos
+    # ------------------------------------------------------------------
+    def _surtidora_ultima_compra(self, producto, por_suplidor, unidades_base, nombre_unidad):
+        """Última compra a ESTE suplidor. Si nunca se le compró, nada.
+
+        Un 0.00 se leería como "se lo compré hoy gratis", así que se omite.
+        """
+        propia = por_suplidor.get(self.partner_id.id)
+        if not propia:
+            return {}
+        orden, linea = propia
+        return {
+            'surtidoraUltimaFecha': format_date(self.env, orden['date_approve']),
+            'surtidoraUltimoPrecio': format_amount(
+                self.env,
+                self._surtidora_precio_neto(orden, linea, producto.uom_id, unidades_base),
+                self.currency_id),
+            'surtidoraUltimaUnidad': nombre_unidad,
+        }
+
+    def _surtidora_otros_suplidores(self, producto, por_suplidor, unidades_base):
+        """Quién más le ha vendido este producto, y a cuánto.
+
+        Es la munición para negociar: "este mismo me lo dio otro más barato".
+        Se excluye el suplidor de la orden, que ya sale como última compra, y
+        se ordena por fecha para que arriba quede el precio más reciente —
+        no el más barato, que puede ser de hace tres años.
+        """
+        otros = [
+            (orden, linea, partner_id)
+            for partner_id, (orden, linea) in por_suplidor.items()
+            if partner_id != self.partner_id.id
+        ]
+        if not otros:
+            return {}
+        otros.sort(key=lambda x: x[0]['date_approve'], reverse=True)
+        return {
+            'surtidoraOtrosSuplidores': [{
+                'suplidor': linea['partner_id'][1] if linea['partner_id'] else '',
+                'fecha': format_date(self.env, orden['date_approve']),
+                'precio': format_amount(
+                    self.env,
+                    self._surtidora_precio_neto(orden, linea, producto.uom_id, unidades_base),
+                    self.currency_id),
+            } for orden, linea, _pid in otros[:_OTROS_SUPLIDORES_MAX]],
+        }
+
+    def _surtidora_costo_discrepante(self, producto, unidades_base, nombre_unidad, datos_producto):
+        """El costo de la ficha, SOLO si no coincide con la tarifa.
+
+        Enseñarlo siempre sería repetir el número de arriba: el ETL cargó
+        costo y tarifa de la misma columna de ADG, así que coinciden al
+        centavo en 3,737 de 3,755 tarifas, y con costeo estándar Odoo no lo
+        actualiza nunca por su cuenta.
+
+        Cuando NO coinciden casi siempre es un dato malo —una unidad base
+        equivocada deja el costo en 4.16 contra una tarifa de 228.57— y eso sí
+        hay que verlo antes de firmar la compra. Por eso aparece como aviso y
+        no como columna fija.
+
+        La comparación va con `compare_amounts` en vez de un umbral inventado:
+        el criterio es "¿son cantidades de dinero distintas?", y a precisión de
+        moneda no hay ni un falso positivo por redondeo (medido: 3,737 exactos).
+        """
+        costo = producto.standard_price * unidades_base
+        tarifa = datos_producto.get('price')
+        if not costo or tarifa is None:
+            return {}
+        if not self.currency_id.compare_amounts(costo, tarifa):
+            return {}
+        return {
+            'surtidoraCosto': format_amount(self.env, costo, self.currency_id),
+            'surtidoraCostoUnidad': nombre_unidad,
+        }
+
+    # ------------------------------------------------------------------
+    # Lectura por lotes
+    # ------------------------------------------------------------------
+    def _surtidora_lineas_compradas(self, products):
+        """Líneas de compra de estos productos, de CUALQUIER suplidor.
+
+        Sin filtrar por suplidor a propósito: de la misma lectura salen la
+        última compra a este y la de los demás. `company_id` está almacenado
+        en la línea, así que el filtro no cuesta un join extra.
+
+        Trae TODO el histórico de los productos de la página, no una ventana de
+        meses: recortarlo escondería la última compra de un producto que se
+        pide una vez al año, que es justo el que hay que mirar antes de
+        negociar. El volumen queda acotado por la paginación del catálogo —
+        son las tarjetas visibles, no el catálogo entero.
+        """
+        return self.env['purchase.order.line'].search_read(
+            [('product_id', 'in', products.ids),
+             ('company_id', '=', self.company_id.id),
+             ('order_id.state', 'in', _ESTADOS_COMPRADOS),
+             # una cantidad negativa es una devolución al suplidor; devolver
+             # no es comprar y su precio no sirve para negociar
+             ('product_qty', '>', 0)],
+            ['product_id', 'partner_id', 'product_uom_id', 'product_qty',
+             'price_subtotal', 'order_id'])
+
+    def _surtidora_ordenes_de(self, lineas):
+        """Fecha y moneda de las órdenes del lote.
+
+        Va en consulta aparte a propósito: en la línea, `date_approve` es un
+        related SIN almacenar, así que no se puede ordenar por él en SQL ni
+        confiar en el orden de los ids (una orden vieja se puede confirmar hoy).
+        """
+        ids = list({linea['order_id'][0] for linea in lineas})
+        return {
+            orden['id']: orden
+            for orden in self.env['purchase.order'].search_read(
+                [('id', 'in', ids)], ['date_approve', 'currency_id'])
+        }
+
+    def _surtidora_ultima_por_suplidor(self, lineas, ordenes):
+        """{product_id: {partner_id: (orden, linea)}} con la compra más
+        reciente de cada par producto+suplidor."""
         ultimas = {}
         for linea in lineas:
             orden = ordenes.get(linea['order_id'][0])
             # date_approve puede venir vacío en órdenes migradas: sin fecha no
             # hay forma de saber cuál fue la última, así que la línea se cae.
-            if not orden or not orden['date_approve']:
+            if not orden or not orden['date_approve'] or not linea['partner_id']:
                 continue
-            producto_id = linea['product_id'][0]
-            previa = ultimas.get(producto_id)
+            del_producto = ultimas.setdefault(linea['product_id'][0], {})
+            previa = del_producto.get(linea['partner_id'][0])
             if previa and previa[0]['date_approve'] >= orden['date_approve']:
                 continue
-            ultimas[producto_id] = (orden, linea)
+            del_producto[linea['partner_id'][0]] = (orden, linea)
+        return ultimas
 
-        unidades = self._surtidora_unidad_de_la_tarjeta(products, datos_nativos)
-        bases = {p.id: p.uom_id for p in products}
-        resultado = {}
-        for producto_id, (orden, linea) in ultimas.items():
-            nombre_unidad, unidades_base = unidades[producto_id]
-            resultado[producto_id] = {
-                'surtidoraUltimaFecha': format_date(self.env, orden['date_approve']),
-                'surtidoraUltimoPrecio': format_amount(
-                    self.env,
-                    self._surtidora_precio_neto(
-                        orden, linea, bases.get(producto_id), unidades_base),
-                    self.currency_id),
-                'surtidoraUltimaUnidad': nombre_unidad,
-            }
-        return resultado
-
+    # ------------------------------------------------------------------
+    # Conversiones
+    # ------------------------------------------------------------------
     def _surtidora_unidad_de_la_tarjeta(self, products, datos_nativos):
         """{product_id: (nombre de la unidad, cuántas unidades base vale)}.
 
         En qué unidad está expresado el precio que la tarjeta YA enseña. No es
-        siempre la misma, y de ahí salía el desfase: Odoo toma el precio de la
+        siempre la misma, y de ahí salía un desfase: Odoo toma el precio de la
         LÍNEA cuando el producto ya está en la orden —y entonces va en la
         unidad de esa línea— y el de la TARIFA cuando todavía no está. Con más
         de una línea del mismo producto vuelve a la tarifa, así que solo la
@@ -114,44 +250,10 @@ class PurchaseOrder(models.Model):
                     datos.get('uomFactor') or 1.0)
         return unidades
 
-    def _surtidora_lineas_compradas(self, products):
-        """Líneas de compra a este suplidor. `partner_id` y `company_id` están
-        almacenados en la línea, así que el filtro no cuesta un join extra.
-
-        Trae TODO el histórico de los productos de la página, no una ventana de
-        meses: recortarlo escondería la última compra de un producto que se
-        pide una vez al año, que es justo el que hay que mirar antes de
-        negociar. El volumen queda acotado por la paginación del catálogo —
-        son las tarjetas visibles, no el catálogo entero.
-        """
-        return self.env['purchase.order.line'].search_read(
-            [('product_id', 'in', products.ids),
-             ('partner_id', '=', self.partner_id.id),
-             ('company_id', '=', self.company_id.id),
-             ('order_id.state', 'in', _ESTADOS_COMPRADOS),
-             # una cantidad negativa es una devolución al suplidor; devolver
-             # no es comprar y su precio no sirve para negociar
-             ('product_qty', '>', 0)],
-            ['product_id', 'product_uom_id', 'product_qty', 'price_subtotal', 'order_id'])
-
-    def _surtidora_ordenes_de(self, lineas):
-        """Fecha y moneda de las órdenes del lote.
-
-        Va en consulta aparte a propósito: en la línea, `date_approve` es un
-        related SIN almacenar, así que no se puede ordenar por él en SQL ni
-        confiar en el orden de los ids (una orden vieja se puede confirmar hoy).
-        """
-        ids = list({linea['order_id'][0] for linea in lineas})
-        return {
-            orden['id']: orden
-            for orden in self.env['purchase.order'].search_read(
-                [('id', 'in', ids)], ['date_approve', 'currency_id'])
-        }
-
     def _surtidora_precio_neto(self, orden, linea, base, unidades_base):
         """Lo que se pagó por UNA de las unidades que muestra la tarjeta, SIN ITBIS.
 
-        Dos decisiones, y las dos son para que los dos números de la tarjeta se
+        Dos decisiones, y las dos son para que los números de la tarjeta se
         puedan comparar de un vistazo:
 
         1. NETO. Justo encima va el precio de la tarifa, que también es neto.
