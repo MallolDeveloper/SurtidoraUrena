@@ -142,17 +142,31 @@ class PurchaseOrder(models.Model):
         La comparación va con `compare_amounts` en vez de un umbral inventado:
         el criterio es "¿son cantidades de dinero distintas?", y a precisión de
         moneda no hay ni un falso positivo por redondeo (medido: 3,737 exactos).
+
+        Se ENSEÑA el costo tal como está registrado en la ficha —129.92 por
+        Paquete— y no convertido a la unidad de la tarjeta —1,818.88 por Caja
+        de 14—: el comprador tiene que poder reconocer el número que ve en el
+        producto. La conversión se añade al lado solo cuando la unidad de la
+        tarjeta es otra, para que la comparación contra la tarifa no exija
+        multiplicar de cabeza.
         """
-        costo = producto.standard_price * unidades_base
+        costo_en_ficha = producto.standard_price
+        costo_en_tarjeta = costo_en_ficha * unidades_base
         tarifa = datos_producto.get('price')
-        if not costo or tarifa is None:
+        if not costo_en_ficha or tarifa is None:
             return {}
-        if not self.currency_id.compare_amounts(costo, tarifa):
+        if not self.currency_id.compare_amounts(costo_en_tarjeta, tarifa):
             return {}
-        return {
-            'surtidoraCosto': format_amount(self.env, costo, self.currency_id),
-            'surtidoraCostoUnidad': nombre_unidad,
+
+        aviso = {
+            'surtidoraCosto': format_amount(self.env, costo_en_ficha, self.currency_id),
+            'surtidoraCostoUnidad': producto.uom_id.display_name,
         }
+        if abs(unidades_base - 1.0) > 1e-9:
+            aviso['surtidoraCostoEquivale'] = format_amount(
+                self.env, costo_en_tarjeta, self.currency_id)
+            aviso['surtidoraCostoEquivaleUnidad'] = nombre_unidad
+        return aviso
 
     # ------------------------------------------------------------------
     # Lectura por lotes
