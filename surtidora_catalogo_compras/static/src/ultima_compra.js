@@ -12,6 +12,7 @@ import { ProductCatalogPurchaseSuggestOrderLine } from "@purchase_stock/product_
 const PROPS_ULTIMA_COMPRA = {
     surtidoraUltimaFecha: { type: String, optional: true },
     surtidoraUltimoPrecio: { type: String, optional: true },
+    surtidoraUltimaUnidad: { type: String, optional: true },
 };
 
 for (const Componente of [
