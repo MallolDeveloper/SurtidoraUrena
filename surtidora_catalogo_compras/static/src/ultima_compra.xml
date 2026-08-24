@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!--
+        Va en el CUERPO de la tarjeta, no dentro del `t-portal` del precio.
+
+        El portal teletransporta su contenido a otro nodo del DOM y en el core
+        no hay ni un solo caso que le meta hermanos, así que no es sitio para
+        estrenar. La raíz de esta plantilla, en cambio, YA tiene varios
+        hermanos (el portal, los avisos de solo-lectura y los controles de
+        cantidad): colgarse de ahí es lo que el core ya hace.
+
+        Se hereda la plantilla COMPARTIDA con el catálogo de ventas a propósito:
+        allí el servidor nunca manda estos datos, el t-if no se cumple y no se
+        dibuja nada.
+    -->
+    <t t-name="surtidora_catalogo_compras.UltimaCompra"
+       t-inherit="product.ProductCatalogOrderLine" t-inherit-mode="extension">
+        <xpath expr="//t[@t-portal]" position="after">
+            <div t-if="props.surtidoraUltimaFecha"
+                 class="o_surtidora_ultima_compra text-muted small text-truncate px-2 pb-1">
+                <i class="fa fa-history me-1" role="img" aria-label="Última compra"/>
+                <span>Últ. compra </span>
+                <span t-out="props.surtidoraUltimaFecha"/>
+                <span class="mx-1">·</span>
+                <span class="fw-bold" t-out="props.surtidoraUltimoPrecio"/>
+            </div>
+        </xpath>
+    </t>
+
+</templates>
