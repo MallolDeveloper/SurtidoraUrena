@@ -27,7 +27,7 @@ Reglas que lo hacen fiable:
 No toca el sugerido nativo, ni `purchase`, ni `purchase_stock`, ni el catálogo
 de ventas. Solo lee y presenta.
     """,
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.3.0',
     'category': 'Inventory/Purchase',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

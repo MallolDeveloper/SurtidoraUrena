@@ -18,7 +18,7 @@
        t-inherit="product.ProductCatalogOrderLine" t-inherit-mode="extension">
         <xpath expr="//t[@t-portal]" position="after">
             <div t-if="props.surtidoraUltimaFecha"
-                 class="o_surtidora_ultima_compra text-muted small text-truncate px-2 pb-1">
+                 class="o_surtidora_ultima_compra text-muted small px-2 pb-1">
                 <i class="fa fa-history me-1" role="img" aria-label="Última compra"/>
                 <span>Últ. compra </span>
                 <span t-out="props.surtidoraUltimaFecha"/>
