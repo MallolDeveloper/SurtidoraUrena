@@ -21,6 +21,9 @@ const PROPS_SURTIDORA = {
     surtidoraCostoUnidad: { type: String, optional: true },
     surtidoraCostoEquivale: { type: String, optional: true },
     surtidoraCostoEquivaleUnidad: { type: String, optional: true },
+    // quién se lo llevó por última vez
+    surtidoraUltimaVentaFecha: { type: String, optional: true },
+    surtidoraUltimoCliente: { type: String, optional: true },
 };
 
 for (const Componente of [

@@ -2,9 +2,11 @@
 """Lo que hace falta saber de un producto ANTES de pedirlo, en su tarjeta.
 
 Odoo enseña el precio de la tarifa: lo que el suplidor pide hoy. Este módulo
-añade las tres cosas que se miran para decidir si ese precio es bueno:
+añade lo que se mira para decidir si ese precio es bueno y si vale la pena
+pedirlo:
 
     · cuándo y a cuánto se le compró por última vez A ESE suplidor
+    · quién se lo llevó por última vez, y cuándo
     · qué otros suplidores lo han vendido, y a cuánto
     · el costo de la ficha, PERO solo si no coincide con la tarifa
 
@@ -35,6 +37,10 @@ _ESTADOS_COMPRADOS = ('purchase', 'done')
 # la ficha del producto.
 _OTROS_SUPLIDORES_MAX = 2
 
+# Cómo se llama al cliente de una venta de mostrador sin nombre. No es un dato
+# que falte: es que se vendió al público.
+_MOSTRADOR = 'Mostrador'
+
 
 class PurchaseOrder(models.Model):
     _inherit = 'purchase.order'
@@ -62,6 +68,7 @@ class PurchaseOrder(models.Model):
         ordenes = self._surtidora_ordenes_de(lineas) if lineas else {}
         ultimas = self._surtidora_ultima_por_suplidor(lineas, ordenes)
         unidades = self._surtidora_unidad_de_la_tarjeta(products, datos_nativos)
+        ventas = self._surtidora_ultima_venta(products)
 
         resultado = {}
         for producto in products:
@@ -74,6 +81,7 @@ class PurchaseOrder(models.Model):
             ficha.update(self._surtidora_costo_discrepante(
                 producto, unidades_base, nombre_unidad,
                 datos_nativos.get(producto.id) or {}))
+            ficha.update(ventas.get(producto.id, {}))
             if ficha:
                 resultado[producto.id] = ficha
         return resultado
@@ -167,6 +175,88 @@ class PurchaseOrder(models.Model):
                 self.env, costo_en_tarjeta, self.currency_id)
             aviso['surtidoraCostoEquivaleUnidad'] = nombre_unidad
         return aviso
+
+    def _surtidora_ultima_venta(self, products):
+        """{product_id: {surtidoraUltimaVentaFecha, surtidoraUltimoCliente}}.
+
+        Quién se lo llevó por última vez. Para el comprador es la respuesta a
+        "¿esto todavía se mueve, y quién lo está pidiendo?".
+
+        Mira las DOS puertas de salida, porque en Surtidora se vende por las
+        dos y quedarse con una sola daría una fecha vieja: el mostrador (POS)
+        no genera `sale.order`, y el crédito no pasa por el POS.
+
+        Va con `sudo()` a propósito. Los permisos de lectura son:
+
+            sale.order.line -> Ventas, Contabilidad, Inventario, Portal
+            pos.order.line  -> SOLO «Punto de venta / Usuario»
+
+        Un comprador no tiene el de POS, así que sin `sudo()` esto no sería un
+        dato que falta: sería un AccessError que tumba el catálogo entero. La
+        contrapartida es que el nombre del cliente queda a la vista de quien
+        pueda abrir el catálogo de compras — es una decisión, no un descuido.
+
+        No se muestra el PRECIO de venta a propósito: lleva ITBIS dentro y va
+        en otra unidad que el resto de la tarjeta, y mezclar bases es lo que ya
+        nos costó dos correcciones.
+        """
+        candidatas = {}
+
+        def anotar(product_id, fecha, cliente):
+            if not fecha:
+                return
+            previa = candidatas.get(product_id)
+            if previa and previa[0] >= fecha:
+                return
+            candidatas[product_id] = (fecha, cliente)
+
+        lineas = self.env['sale.order.line'].sudo().search_read(
+            [('product_id', 'in', products.ids),
+             ('company_id', '=', self.company_id.id),
+             ('order_id.state', 'in', ('sale', 'done')),
+             ('product_uom_qty', '>', 0)],
+            ['product_id', 'order_id'])
+        if lineas:
+            ordenes = {
+                o['id']: o for o in self.env['sale.order'].sudo().search_read(
+                    [('id', 'in', list({l['order_id'][0] for l in lineas}))],
+                    ['date_order', 'partner_id'])
+            }
+            for linea in lineas:
+                orden = ordenes.get(linea['order_id'][0])
+                if orden:
+                    anotar(linea['product_id'][0], orden['date_order'],
+                           orden['partner_id'][1] if orden['partner_id'] else '')
+
+        if 'pos.order.line' in self.env:
+            lineas = self.env['pos.order.line'].sudo().search_read(
+                [('product_id', 'in', products.ids),
+                 ('company_id', '=', self.company_id.id),
+                 ('order_id.state', 'in', ('paid', 'done', 'invoiced')),
+                 ('qty', '>', 0)],
+                ['product_id', 'order_id'])
+            if lineas:
+                ordenes = {
+                    o['id']: o for o in self.env['pos.order'].sudo().search_read(
+                        [('id', 'in', list({l['order_id'][0] for l in lineas}))],
+                        ['date_order', 'partner_id'])
+                }
+                for linea in lineas:
+                    orden = ordenes.get(linea['order_id'][0])
+                    if orden:
+                        # una venta de mostrador sin cliente no es un dato que
+                        # falta: es que se vendió al público
+                        anotar(linea['product_id'][0], orden['date_order'],
+                               orden['partner_id'][1] if orden['partner_id']
+                               else _MOSTRADOR)
+
+        return {
+            product_id: {
+                'surtidoraUltimaVentaFecha': format_date(self.env, fecha),
+                'surtidoraUltimoCliente': cliente,
+            }
+            for product_id, (fecha, cliente) in candidatas.items() if cliente
+        }
 
     # ------------------------------------------------------------------
     # Lectura por lotes
