@@ -38,12 +38,7 @@ class PurchaseOrder(models.Model):
 
     # ------------------------------------------------------------------
     def _surtidora_ultima_compra(self, products, datos_nativos):
-        """{product_id: {surtidoraUltimaFecha, surtidoraUltimoPrecio}}.
-
-        `datos_nativos` es lo que ya devolvió Odoo: de ahí sale `uomFactor`,
-        para no calcular la unidad por nuestra cuenta y acabar discrepando
-        con el precio que la propia tarjeta enseña al lado.
-        """
+        """{product_id: {surtidoraUltimaFecha, surtidoraUltimoPrecio, surtidoraUltimaUnidad}}."""
         # En una orden nueva todavía no hay suplidor, y sin suplidor esto no
         # significa nada: la gracia es "cuánto le pagué A ÉL".
         if len(self) != 1 or not self.partner_id or not products:
@@ -67,19 +62,57 @@ class PurchaseOrder(models.Model):
                 continue
             ultimas[producto_id] = (orden, linea)
 
+        unidades = self._surtidora_unidad_de_la_tarjeta(products, datos_nativos)
         bases = {p.id: p.uom_id for p in products}
-        return {
-            producto_id: {
+        resultado = {}
+        for producto_id, (orden, linea) in ultimas.items():
+            nombre_unidad, unidades_base = unidades[producto_id]
+            resultado[producto_id] = {
                 'surtidoraUltimaFecha': format_date(self.env, orden['date_approve']),
                 'surtidoraUltimoPrecio': format_amount(
                     self.env,
-                    self._surtidora_precio_en_unidad_de_tarjeta(
-                        orden, linea, bases.get(producto_id),
-                        (datos_nativos.get(producto_id) or {}).get('uomFactor') or 1.0),
+                    self._surtidora_precio_neto(
+                        orden, linea, bases.get(producto_id), unidades_base),
                     self.currency_id),
+                'surtidoraUltimaUnidad': nombre_unidad,
             }
-            for producto_id, (orden, linea) in ultimas.items()
-        }
+        return resultado
+
+    def _surtidora_unidad_de_la_tarjeta(self, products, datos_nativos):
+        """{product_id: (nombre de la unidad, cuántas unidades base vale)}.
+
+        En qué unidad está expresado el precio que la tarjeta YA enseña. No es
+        siempre la misma, y de ahí salía el desfase: Odoo toma el precio de la
+        LÍNEA cuando el producto ya está en la orden —y entonces va en la
+        unidad de esa línea— y el de la TARIFA cuando todavía no está. Con más
+        de una línea del mismo producto vuelve a la tarifa, así que solo la
+        línea única manda.
+
+        El nombre se toma de la línea y no de `uomDisplayName` a propósito:
+        Odoo solo corrige esa etiqueta si la unidad de la línea difiere de la
+        unidad base del producto (`purchase_order_line.py`), así que una línea
+        en la unidad base contra una tarifa en cajas se queda con la etiqueta
+        del suplidor, que no es la del precio que muestra.
+        """
+        por_producto = {}
+        for linea in self.order_line:
+            if linea.product_id:
+                por_producto.setdefault(linea.product_id.id, []).append(linea)
+
+        unidades = {}
+        for producto in products:
+            propias = por_producto.get(producto.id) or []
+            if len(propias) == 1:
+                uom = propias[0].product_uom_id
+                unidades[producto.id] = (
+                    uom.display_name,
+                    uom._compute_quantity(1.0, producto.uom_id, round=False) or 1.0)
+            else:
+                datos = datos_nativos.get(producto.id) or {}
+                unidades[producto.id] = (
+                    datos.get('uomDisplayName') or producto.uom_id.display_name,
+                    datos.get('uomFactor') or 1.0)
+        return unidades
 
     def _surtidora_lineas_compradas(self, products):
         """Líneas de compra a este suplidor. `partner_id` y `company_id` están
@@ -99,7 +132,7 @@ class PurchaseOrder(models.Model):
              # una cantidad negativa es una devolución al suplidor; devolver
              # no es comprar y su precio no sirve para negociar
              ('product_qty', '>', 0)],
-            ['product_id', 'product_uom_id', 'product_qty', 'price_total', 'order_id'])
+            ['product_id', 'product_uom_id', 'product_qty', 'price_subtotal', 'order_id'])
 
     def _surtidora_ordenes_de(self, lineas):
         """Fecha y moneda de las órdenes del lote.
@@ -115,27 +148,30 @@ class PurchaseOrder(models.Model):
                 [('id', 'in', ids)], ['date_approve', 'currency_id'])
         }
 
-    def _surtidora_precio_en_unidad_de_tarjeta(self, orden, linea, base, uom_factor):
-        """Lo que se pagó por una unidad de las que muestra la tarjeta, CON ITBIS.
+    def _surtidora_precio_neto(self, orden, linea, base, unidades_base):
+        """Lo que se pagó por UNA de las unidades que muestra la tarjeta, SIN ITBIS.
 
-        Dos conversiones, y las dos han mordido antes en este proyecto:
+        Dos decisiones, y las dos son para que los dos números de la tarjeta se
+        puedan comparar de un vistazo:
 
-        1. IMPUESTO. Se parte de `price_total`, que ya trae impuestos y
-           descuentos aplicados. Usar `price_unit` obligaría a saber si el
-           impuesto está configurado como incluido — y en esta base lo está por
-           herencia de la compañía, no por el propio impuesto, que dice que no.
-        2. UNIDAD. La tarjeta enseña el precio por la unidad de la TARIFA
-           (una caja), y la compra pudo hacerse en paquetes sueltos. Poner
-           135.59 al lado de 1,084.72 sería invitar a un error de negociación.
+        1. NETO. Justo encima va el precio de la tarifa, que también es neto.
+           Mostrar uno con impuesto y otro sin él hace que un precio que no se
+           movió parezca una subida del 18%. Se parte de `price_subtotal` —la
+           base imponible, ya con el descuento aplicado— y no de `price_unit`,
+           así el número no depende de si el impuesto está configurado como
+           incluido o excluido.
+        2. MISMA UNIDAD que ese precio (ver `_surtidora_unidad_de_la_tarjeta`).
+           Poner 135.59 por paquete al lado de 1,084.72 por caja sería invitar
+           a un error de negociación.
         """
-        precio = linea['price_total'] / linea['product_qty']
+        precio = linea['price_subtotal'] / linea['product_qty']
 
         uom_linea = self.env['uom.uom'].browse(
             linea['product_uom_id'][0]) if linea['product_uom_id'] else base
         if uom_linea and base:
-            unidades_base = uom_linea._compute_quantity(1.0, base, round=False)
-            if unidades_base:
-                precio = precio / unidades_base * uom_factor
+            en_base = uom_linea._compute_quantity(1.0, base, round=False)
+            if en_base:
+                precio = precio / en_base * unidades_base
 
         moneda = self.env['res.currency'].browse(orden['currency_id'][0]) \
             if orden.get('currency_id') else self.currency_id

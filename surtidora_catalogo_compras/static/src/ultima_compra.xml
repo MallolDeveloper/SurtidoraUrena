@@ -24,6 +24,9 @@
                 <span t-out="props.surtidoraUltimaFecha"/>
                 <span class="mx-1">·</span>
                 <span class="fw-bold" t-out="props.surtidoraUltimoPrecio"/>
+                <span t-if="props.surtidoraUltimaUnidad">
+                    / <t t-out="props.surtidoraUltimaUnidad"/>
+                </span>
             </div>
         </xpath>
     </t>
