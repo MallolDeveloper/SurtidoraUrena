@@ -2,8 +2,19 @@
 """La última compra a ESE suplidor, en la tarjeta del catálogo.
 
 El catálogo pide los datos de las tarjetas visibles en UNA sola llamada a
-`_get_product_catalog_order_data`, que recibe el lote completo de productos.
-Por eso todo aquí se resuelve en dos consultas por página, no una por tarjeta.
+`_get_product_catalog_order_line_info`, que recibe el lote completo. Por eso
+todo aquí se resuelve en dos consultas por página, no una por tarjeta.
+
+Y se engancha AHÍ, no en `_get_product_catalog_order_data`, aunque ese último
+parezca el sitio natural. Odoo arma la respuesta por DOS caminos según el
+producto ya esté o no en la orden:
+
+    ya en la orden  ->  purchase.order.line._get_product_catalog_lines_data()
+    todavía no      ->  purchase.order._get_product_catalog_order_data()
+
+Colgarse del segundo deja sin dato justo las tarjetas que el comprador ya
+tocó — que son las que está mirando. `_get_product_catalog_order_line_info`
+es donde los dos caminos vuelven a juntarse.
 """
 from odoo import models
 from odoo.tools.misc import format_amount, format_date
@@ -16,11 +27,13 @@ _ESTADOS_COMPRADOS = ('purchase', 'done')
 class PurchaseOrder(models.Model):
     _inherit = 'purchase.order'
 
-    def _get_product_catalog_order_data(self, products, **kwargs):
-        datos = super()._get_product_catalog_order_data(products, **kwargs)
-        for product_id, ultima in self._surtidora_ultima_compra(products, datos).items():
-            if product_id in datos:
-                datos[product_id].update(ultima)
+    def _get_product_catalog_order_line_info(self, product_ids, child_field=False, **kwargs):
+        datos = super()._get_product_catalog_order_line_info(
+            product_ids, child_field=child_field, **kwargs)
+        productos = self.env['product.product'].browse(product_ids).exists()
+        for producto_id, ultima in self._surtidora_ultima_compra(productos, datos).items():
+            if producto_id in datos:
+                datos[producto_id].update(ultima)
         return datos
 
     # ------------------------------------------------------------------
