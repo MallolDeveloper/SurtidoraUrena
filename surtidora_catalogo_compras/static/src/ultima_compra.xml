@@ -31,6 +31,16 @@
                 </span>
             </div>
 
+            <!-- Quién se lo llevó por última vez: ¿esto todavía se mueve? -->
+            <div t-if="props.surtidoraUltimoCliente"
+                 class="o_surtidora_ultima_venta text-muted small px-2 pb-1">
+                <i class="fa fa-user-o me-1" role="img" aria-label="Última venta"/>
+                <span>Últ. venta </span>
+                <span t-out="props.surtidoraUltimaVentaFecha"/>
+                <span class="mx-1">·</span>
+                <span class="fw-bold" t-out="props.surtidoraUltimoCliente"/>
+            </div>
+
             <!-- Quién más lo ha vendido, y a cuánto: para negociar -->
             <div t-foreach="props.surtidoraOtrosSuplidores or []" t-as="otro"
                  t-key="otro_index"
