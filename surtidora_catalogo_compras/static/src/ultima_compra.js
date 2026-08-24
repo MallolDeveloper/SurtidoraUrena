@@ -19,6 +19,8 @@ const PROPS_SURTIDORA = {
     // el costo de la ficha, solo cuando NO coincide con la tarifa
     surtidoraCosto: { type: String, optional: true },
     surtidoraCostoUnidad: { type: String, optional: true },
+    surtidoraCostoEquivale: { type: String, optional: true },
+    surtidoraCostoEquivaleUnidad: { type: String, optional: true },
 };
 
 for (const Componente of [

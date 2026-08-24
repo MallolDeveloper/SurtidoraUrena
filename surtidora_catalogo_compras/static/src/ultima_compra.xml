@@ -58,6 +58,11 @@
                 <span t-if="props.surtidoraCostoUnidad">
                     / <t t-out="props.surtidoraCostoUnidad"/>
                 </span>
+                <span t-if="props.surtidoraCostoEquivale">
+                    <span class="mx-1">=</span>
+                    <t t-out="props.surtidoraCostoEquivale"/>
+                    / <t t-out="props.surtidoraCostoEquivaleUnidad"/>
+                </span>
             </div>
 
         </xpath>
