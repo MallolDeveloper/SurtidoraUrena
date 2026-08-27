@@ -29,7 +29,7 @@ NO se rutea mercancía al almacén de Dañados automáticamente: en ADG el
 almacén de la devolución va en blanco y dañados/vencidos son ~12 casos al
 año — eso se resuelve con un traspaso interno manual.
     """,
-    'version': '19.0.2.0.1',
+    'version': '19.0.2.0.2',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

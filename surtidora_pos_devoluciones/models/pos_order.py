@@ -107,6 +107,14 @@ class PosOrder(models.Model):
             return _('Esta venta se facturó en «%(caja)s». La devolución en '
                      'efectivo tiene que hacerse en esa misma caja.',
                      caja=original.config_id.display_name)
+        if not original.date_order:
+            # Sin fecha no se puede afirmar que sea del día, y aquí sale
+            # dinero: se bloquea. `context_timestamp` con vacío no devuelve
+            # None, revienta con un assert — y un assert en la caja es una
+            # pantalla de error en la cara del cliente, no un aviso.
+            return _('Esta venta no tiene fecha registrada, así que no se '
+                     'puede confirmar que sea del día. La devolución la '
+                     'tramita contabilidad.')
         hoy = fields.Date.context_today(self)
         dia = fields.Datetime.context_timestamp(self, original.date_order).date()
         if dia != hoy:
