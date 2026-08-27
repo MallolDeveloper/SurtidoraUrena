@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        La bitácora de quién autorizó devolver efectivo. Es de solo lectura a
+        propósito: una autorización que se puede editar después no sirve para
+        auditar nada.
+    -->
+    <record id="view_autorizacion_devolucion_list" model="ir.ui.view">
+        <field name="name">surtidora.autorizacion.devolucion.list</field>
+        <field name="model">surtidora.autorizacion.devolucion</field>
+        <field name="arch" type="xml">
+            <list string="Devoluciones en efectivo autorizadas" create="false" edit="false">
+                <field name="create_date" string="Cuándo"/>
+                <field name="order_ref" string="Venta"/>
+                <field name="pos_order_id" string="Devolución"
+                       optional="show"
+                       widget="many2one"/>
+                <field name="cajero_id" string="Lo pidió"/>
+                <field name="autorizador_id" string="Autorizó"/>
+                <field name="monto" sum="Total devuelto"/>
+                <field name="consumida" string="Usada" optional="hide"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="company_id" column_invisible="True" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_autorizacion_devolucion_search" model="ir.ui.view">
+        <field name="name">surtidora.autorizacion.devolucion.search</field>
+        <field name="model">surtidora.autorizacion.devolucion</field>
+        <field name="arch" type="xml">
+            <search string="Devoluciones en efectivo">
+                <field name="order_ref"/>
+                <field name="autorizador_id"/>
+                <field name="cajero_id"/>
+                <!--
+                    Una autorización sin devolución enlazada es justo lo que un
+                    encargado quiere ver: se pidió la clave y después no se
+                    cobró nada.
+                -->
+                <filter name="sin_cobrar" string="Autorizadas sin cobrar"
+                        domain="[('pos_order_id', '=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="por_autorizador" string="Autorizó"
+                            context="{'group_by': 'autorizador_id'}"/>
+                    <filter name="por_cajero" string="Lo pidió"
+                            context="{'group_by': 'cajero_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_autorizacion_devolucion" model="ir.actions.act_window">
+        <field name="name">Devoluciones en efectivo</field>
+        <field name="res_model">surtidora.autorizacion.devolucion</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_autorizacion_devolucion_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Todavía no se ha autorizado ninguna devolución en efectivo</p>
+            <p>Aquí queda registro de cada vez que un supervisor autorizó sacar
+               dinero de la caja para devolvérselo a un cliente.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_autorizacion_devolucion"
+              name="Devoluciones en efectivo"
+              parent="point_of_sale.menu_point_of_sale"
+              action="action_autorizacion_devolucion"
+              groups="point_of_sale.group_pos_manager"
+              sequence="60"/>
+
+</odoo>

@@ -22,7 +22,9 @@ import { _t } from "@web/core/l10n/translation";
  * pero avisa en pantalla para que la degradación sea visible.
  */
 
-function esDevolucion(orden) {
+// Exportada: el candado de la devolución en EFECTIVO usa exactamente el
+// mismo criterio. Duplicarlo sería garantizar que un día divergen.
+export function esDevolucion(orden) {
     // Reembolso formal, preset de devolución, o línea negativa manual.
     // Las líneas negativas de pos_sale (anticipos/liquidación de
     // cotización) NO son devolución: llevan referencia a la venta origen.
