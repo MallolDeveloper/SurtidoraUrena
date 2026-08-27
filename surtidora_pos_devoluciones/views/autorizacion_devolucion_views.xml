@@ -41,7 +41,13 @@
                 -->
                 <filter name="sin_cobrar" string="Autorizadas sin cobrar"
                         domain="[('pos_order_id', '=', False)]"/>
-                <group expand="0" string="Agrupar por">
+                <separator/>
+                <!--
+                    <group> SIN atributos: el RNG de Odoo 19 rechaza `expand`
+                    y `string` aquí, y el error que da («Element search has
+                    extra content: field») no señala al culpable.
+                -->
+                <group>
                     <filter name="por_autorizador" string="Autorizó"
                             context="{'group_by': 'autorizador_id'}"/>
                     <filter name="por_cajero" string="Lo pidió"
