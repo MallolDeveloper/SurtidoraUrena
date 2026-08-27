@@ -80,7 +80,7 @@ class PurchaseOrder(models.Model):
             ficha.update(self._surtidora_ultima_compra(
                 producto, propias, unidades_base, nombre_unidad))
             ficha.update(self._surtidora_rotacion(
-                producto, propias, unidades_base, del_producto.get('movimientos') or []))
+                producto, propias, del_producto.get('movimientos') or []))
             ficha.update(self._surtidora_otros_suplidores(
                 producto, propias, unidades_base))
             ficha.update(self._surtidora_costo_discrepante(
@@ -181,8 +181,8 @@ class PurchaseOrder(models.Model):
             aviso['surtidoraCostoEquivaleUnidad'] = nombre_unidad
         return aviso
 
-    def _surtidora_rotacion(self, producto, por_suplidor, unidades_base, movimientos):
-        """Cuánto de la ÚLTIMA compra se ha vendido, y en cuántos días.
+    def _surtidora_rotacion(self, producto, por_suplidor, movimientos):
+        """Qué pasó con la ÚLTIMA compra, en porcentaje.
 
         Es el dato que se mira con el vendedor del suplidor delante, cuando
         aparece con mercancía que nadie pidió: no basta con saber qué hay en
@@ -190,9 +190,16 @@ class PurchaseOrder(models.Model):
 
         Tres lecturas, y la tercera es la que importa:
 
-            se vendió todo    -> se agotó, y en cuántos días
-            se vendió parte   -> cuánto de cuánto
+            se vendió todo    -> la última compra se agotó, y en cuántos días
+            se vendió parte   -> qué porcentaje
             no se vendió NADA -> aviso: lo de la vez pasada sigue completo
+
+        Va en PORCENTAJE y no en cantidades a propósito. Una compra vieja
+        hecha en paquetes, leída en la unidad de la tarjeta —cajas—, daba
+        números como «13.43», que ni son lo que nadie compró ni dicen de qué
+        son sin mirar la línea de arriba. La proporción, en cambio, no depende
+        de la unidad: por eso aquí se cuenta todo en unidad base y no hace
+        falta convertir nada.
         """
         propia = por_suplidor.get(self.partner_id.id)
         if not propia:
@@ -206,36 +213,29 @@ class PurchaseOrder(models.Model):
         if dias <= 0:
             return {}
 
-        factor = unidades_base or 1.0
-        comprada = (linea['product_qty']
-                    * self._surtidora_unidades_base_de(linea, producto.uom_id)
-                    / factor)
+        comprada = linea['product_qty'] * self._surtidora_unidades_base_de(
+            linea, producto.uom_id)
         if comprada <= 0:
             return {}
-        vendida = sum(q for f, q in movimientos if f >= orden['date_approve']) / factor
+        vendida = sum(q for f, q in movimientos if f >= orden['date_approve'])
 
         if vendida <= 0:
-            texto = _('Ninguna de %(compradas)s vendida en %(dias)s días',
-                      compradas=self._surtidora_cantidad(comprada), dias=dias)
+            texto = _('Sin vender nada de la última compra · %s días') % dias
         elif vendida >= comprada:
-            texto = _('Las %(compradas)s se agotaron en %(dias)s días',
-                      compradas=self._surtidora_cantidad(comprada), dias=dias)
+            texto = _('Última compra agotada en %s días') % dias
         else:
-            texto = _('Vendidas %(vendidas)s de %(compradas)s en %(dias)s días',
-                      vendidas=self._surtidora_cantidad(vendida),
-                      compradas=self._surtidora_cantidad(comprada), dias=dias)
+            porcentaje = 100.0 * vendida / comprada
+            if porcentaje < 1:
+                # redondear a 0% diría «no se vendió nada», que es otra cosa
+                texto = _('Vendido menos del 1%% de la última compra · %(dias)s días',
+                          dias=dias)
+            else:
+                texto = _('Vendido %(pct)s%% de la última compra · %(dias)s días',
+                          pct=int(porcentaje), dias=dias)
         return {
             'surtidoraRotacion': texto,
             'surtidoraRotacionParada': vendida <= 0,
         }
-
-    @staticmethod
-    def _surtidora_cantidad(valor):
-        """Cantidades para leer, no para auditar: sin decimales cuando son
-        redondas, que es el caso normal al comprar por caja."""
-        if abs(valor - round(valor)) < 0.01:
-            return '%d' % round(valor)
-        return '%.2f' % valor
 
     def _surtidora_ventas(self, products):
         """{product_id: {'ultima': {...}, 'movimientos': [(fecha, qty_base)]}}.
