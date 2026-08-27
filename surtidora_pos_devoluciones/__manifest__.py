@@ -29,7 +29,7 @@ NO se rutea mercancía al almacén de Dañados automáticamente: en ADG el
 almacén de la devolución va en blanco y dañados/vencidos son ~12 casos al
 año — eso se resuelve con un traspaso interno manual.
     """,
-    'version': '19.0.1.0.0',
+    'version': '19.0.2.0.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
@@ -39,6 +39,7 @@ año — eso se resuelve con un traspaso interno manual.
         'data/motivos_devolucion_data.xml',
         'views/motivo_devolucion_views.xml',
         'views/pos_order_views.xml',
+        'views/autorizacion_devolucion_views.xml',
     ],
     'assets': {
         'point_of_sale._assets_pos': [
