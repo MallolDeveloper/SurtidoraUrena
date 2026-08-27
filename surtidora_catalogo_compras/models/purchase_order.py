@@ -6,6 +6,7 @@ añade lo que se mira para decidir si ese precio es bueno y si vale la pena
 pedirlo:
 
     · cuándo y a cuánto se le compró por última vez A ESE suplidor
+    · cuánto de esa última compra se ha vendido, y en cuántos días
     · quién se lo llevó por última vez, y cuándo
     · qué otros suplidores lo han vendido, y a cuánto
     · el costo de la ficha, PERO solo si no coincide con la tarifa
@@ -25,7 +26,7 @@ Colgarse del segundo deja sin dato justo las tarjetas que el comprador ya
 tocó — que son las que está mirando. `_get_product_catalog_order_line_info`
 es donde los dos caminos vuelven a juntarse.
 """
-from odoo import models
+from odoo import _, fields, models
 from odoo.tools.misc import format_amount, format_date
 
 # Estados en los que una orden ya es una compra de verdad. Un borrador no es
@@ -68,20 +69,24 @@ class PurchaseOrder(models.Model):
         ordenes = self._surtidora_ordenes_de(lineas) if lineas else {}
         ultimas = self._surtidora_ultima_por_suplidor(lineas, ordenes)
         unidades = self._surtidora_unidad_de_la_tarjeta(products, datos_nativos)
-        ventas = self._surtidora_ultima_venta(products)
+        ventas = self._surtidora_ventas(products)
 
         resultado = {}
         for producto in products:
             nombre_unidad, unidades_base = unidades[producto.id]
+            propias = ultimas.get(producto.id, {})
+            del_producto = ventas.get(producto.id) or {}
             ficha = {}
             ficha.update(self._surtidora_ultima_compra(
-                producto, ultimas.get(producto.id, {}), unidades_base, nombre_unidad))
+                producto, propias, unidades_base, nombre_unidad))
+            ficha.update(self._surtidora_rotacion(
+                producto, propias, unidades_base, del_producto.get('movimientos') or []))
             ficha.update(self._surtidora_otros_suplidores(
-                producto, ultimas.get(producto.id, {}), unidades_base))
+                producto, propias, unidades_base))
             ficha.update(self._surtidora_costo_discrepante(
                 producto, unidades_base, nombre_unidad,
                 datos_nativos.get(producto.id) or {}))
-            ficha.update(ventas.get(producto.id, {}))
+            ficha.update(del_producto.get('ultima') or {})
             if ficha:
                 resultado[producto.id] = ficha
         return resultado
@@ -176,15 +181,74 @@ class PurchaseOrder(models.Model):
             aviso['surtidoraCostoEquivaleUnidad'] = nombre_unidad
         return aviso
 
-    def _surtidora_ultima_venta(self, products):
-        """{product_id: {surtidoraUltimaVentaFecha, surtidoraUltimoCliente}}.
+    def _surtidora_rotacion(self, producto, por_suplidor, unidades_base, movimientos):
+        """Cuánto de la ÚLTIMA compra se ha vendido, y en cuántos días.
 
-        Quién se lo llevó por última vez. Para el comprador es la respuesta a
-        "¿esto todavía se mueve, y quién lo está pidiendo?".
+        Es el dato que se mira con el vendedor del suplidor delante, cuando
+        aparece con mercancía que nadie pidió: no basta con saber qué hay en
+        almacén, hay que saber si lo anterior se movió o sigue ahí parado.
+
+        Tres lecturas, y la tercera es la que importa:
+
+            se vendió todo    -> se agotó, y en cuántos días
+            se vendió parte   -> cuánto de cuánto
+            no se vendió NADA -> aviso: lo de la vez pasada sigue completo
+        """
+        propia = por_suplidor.get(self.partner_id.id)
+        if not propia:
+            return {}
+        orden, linea = propia
+
+        # La compra del día no dice nada todavía: sin días transcurridos no
+        # hay rotación que medir.
+        comprado = fields.Datetime.context_timestamp(self, orden['date_approve'])
+        dias = (fields.Date.context_today(self) - comprado.date()).days
+        if dias <= 0:
+            return {}
+
+        factor = unidades_base or 1.0
+        comprada = (linea['product_qty']
+                    * self._surtidora_unidades_base_de(linea, producto.uom_id)
+                    / factor)
+        if comprada <= 0:
+            return {}
+        vendida = sum(q for f, q in movimientos if f >= orden['date_approve']) / factor
+
+        if vendida <= 0:
+            texto = _('Ninguna de %(compradas)s vendida en %(dias)s días',
+                      compradas=self._surtidora_cantidad(comprada), dias=dias)
+        elif vendida >= comprada:
+            texto = _('Las %(compradas)s se agotaron en %(dias)s días',
+                      compradas=self._surtidora_cantidad(comprada), dias=dias)
+        else:
+            texto = _('Vendidas %(vendidas)s de %(compradas)s en %(dias)s días',
+                      vendidas=self._surtidora_cantidad(vendida),
+                      compradas=self._surtidora_cantidad(comprada), dias=dias)
+        return {
+            'surtidoraRotacion': texto,
+            'surtidoraRotacionParada': vendida <= 0,
+        }
+
+    @staticmethod
+    def _surtidora_cantidad(valor):
+        """Cantidades para leer, no para auditar: sin decimales cuando son
+        redondas, que es el caso normal al comprar por caja."""
+        if abs(valor - round(valor)) < 0.01:
+            return '%d' % round(valor)
+        return '%.2f' % valor
+
+    def _surtidora_ventas(self, products):
+        """{product_id: {'ultima': {...}, 'movimientos': [(fecha, qty_base)]}}.
+
+        De una sola lectura salen las dos cosas que la tarjeta necesita: quién
+        se lo llevó por última vez, y cuánto se ha vendido desde la última
+        compra. Separarlas costaría el doble de consultas para leer lo mismo.
 
         Mira las DOS puertas de salida, porque en Surtidora se vende por las
-        dos y quedarse con una sola daría una fecha vieja: el mostrador (POS)
-        no genera `sale.order`, y el crédito no pasa por el POS.
+        dos y quedarse con una sola daría una fecha vieja y una cuenta corta:
+        el mostrador (POS) no genera `sale.order`, y el crédito no pasa por el
+        POS. Las cantidades se acumulan en UNIDAD BASE; la conversión a la
+        unidad de la tarjeta la hace quien las use.
 
         Va con `sudo()` a propósito. Los permisos de lectura son:
 
@@ -198,24 +262,24 @@ class PurchaseOrder(models.Model):
 
         No se muestra el PRECIO de venta a propósito: lleva ITBIS dentro y va
         en otra unidad que el resto de la tarjeta, y mezclar bases es lo que ya
-        nos costó dos correcciones.
+        costó dos correcciones.
         """
-        candidatas = {}
+        datos = {}
 
-        def anotar(product_id, fecha, cliente):
-            if not fecha:
-                return
-            previa = candidatas.get(product_id)
-            if previa and previa[0] >= fecha:
-                return
-            candidatas[product_id] = (fecha, cliente)
+        def anotar(product_id, fecha, cliente, cantidad_base):
+            ficha = datos.setdefault(product_id, {'ultima': None, 'movimientos': []})
+            ficha['movimientos'].append((fecha, cantidad_base))
+            if not ficha['ultima'] or ficha['ultima'][0] < fecha:
+                ficha['ultima'] = (fecha, cliente)
+
+        bases = {p.id: p.uom_id for p in products}
 
         lineas = self.env['sale.order.line'].sudo().search_read(
             [('product_id', 'in', products.ids),
              ('company_id', '=', self.company_id.id),
              ('order_id.state', 'in', ('sale', 'done')),
              ('product_uom_qty', '>', 0)],
-            ['product_id', 'order_id'])
+            ['product_id', 'order_id', 'product_uom_qty', 'product_uom_id'])
         if lineas:
             ordenes = {
                 o['id']: o for o in self.env['sale.order'].sudo().search_read(
@@ -224,17 +288,22 @@ class PurchaseOrder(models.Model):
             }
             for linea in lineas:
                 orden = ordenes.get(linea['order_id'][0])
-                if orden:
-                    anotar(linea['product_id'][0], orden['date_order'],
-                           orden['partner_id'][1] if orden['partner_id'] else '')
+                if not orden:
+                    continue
+                producto_id = linea['product_id'][0]
+                anotar(producto_id, orden['date_order'],
+                       orden['partner_id'][1] if orden['partner_id'] else '',
+                       linea['product_uom_qty'] * self._surtidora_unidades_base_de(
+                           linea, bases.get(producto_id)))
 
         if 'pos.order.line' in self.env:
+            # en el POS la cantidad YA viene en la unidad base del producto
             lineas = self.env['pos.order.line'].sudo().search_read(
                 [('product_id', 'in', products.ids),
                  ('company_id', '=', self.company_id.id),
                  ('order_id.state', 'in', ('paid', 'done', 'invoiced')),
                  ('qty', '>', 0)],
-                ['product_id', 'order_id'])
+                ['product_id', 'order_id', 'qty'])
             if lineas:
                 ordenes = {
                     o['id']: o for o in self.env['pos.order'].sudo().search_read(
@@ -243,20 +312,24 @@ class PurchaseOrder(models.Model):
                 }
                 for linea in lineas:
                     orden = ordenes.get(linea['order_id'][0])
-                    if orden:
-                        # una venta de mostrador sin cliente no es un dato que
-                        # falta: es que se vendió al público
-                        anotar(linea['product_id'][0], orden['date_order'],
-                               orden['partner_id'][1] if orden['partner_id']
-                               else _MOSTRADOR)
+                    if not orden:
+                        continue
+                    # una venta de mostrador sin cliente no es un dato que
+                    # falta: es que se vendió al público
+                    anotar(linea['product_id'][0], orden['date_order'],
+                           orden['partner_id'][1] if orden['partner_id'] else _MOSTRADOR,
+                           linea['qty'])
 
-        return {
-            product_id: {
-                'surtidoraUltimaVentaFecha': format_date(self.env, fecha),
-                'surtidoraUltimoCliente': cliente,
-            }
-            for product_id, (fecha, cliente) in candidatas.items() if cliente
-        }
+        for ficha in datos.values():
+            if ficha['ultima'] and ficha['ultima'][1]:
+                fecha, cliente = ficha['ultima']
+                ficha['ultima'] = {
+                    'surtidoraUltimaVentaFecha': format_date(self.env, fecha),
+                    'surtidoraUltimoCliente': cliente,
+                }
+            else:
+                ficha['ultima'] = None
+        return datos
 
     # ------------------------------------------------------------------
     # Lectura por lotes
@@ -388,13 +461,7 @@ class PurchaseOrder(models.Model):
            a un error de negociación.
         """
         precio = linea['price_subtotal'] / linea['product_qty']
-
-        uom_linea = self.env['uom.uom'].browse(
-            linea['product_uom_id'][0]) if linea['product_uom_id'] else base
-        if uom_linea and base:
-            en_base = uom_linea._compute_quantity(1.0, base, round=False)
-            if en_base:
-                precio = precio / en_base * unidades_base
+        precio = precio / self._surtidora_unidades_base_de(linea, base) * unidades_base
 
         moneda = self.env['res.currency'].browse(orden['currency_id'][0]) \
             if orden.get('currency_id') else self.currency_id
@@ -402,3 +469,16 @@ class PurchaseOrder(models.Model):
             precio = moneda._convert(
                 precio, self.currency_id, self.company_id, orden['date_approve'].date())
         return precio
+
+    def _surtidora_unidades_base_de(self, linea, base):
+        """Cuántas unidades base vale UNA unidad de la línea.
+
+        Lo usan el precio y la rotación: la línea puede venir en cajas y la
+        tarjeta hablar en paquetes, o al revés. Nunca devuelve 0 — una
+        división por cero aquí saldría en pantalla como un precio absurdo.
+        """
+        uom = self.env['uom.uom'].browse(
+            linea['product_uom_id'][0]) if linea.get('product_uom_id') else base
+        if not uom or not base:
+            return 1.0
+        return uom._compute_quantity(1.0, base, round=False) or 1.0

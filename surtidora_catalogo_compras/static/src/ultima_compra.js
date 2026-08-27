@@ -21,6 +21,9 @@ const PROPS_SURTIDORA = {
     surtidoraCostoUnidad: { type: String, optional: true },
     surtidoraCostoEquivale: { type: String, optional: true },
     surtidoraCostoEquivaleUnidad: { type: String, optional: true },
+    // cuánto de la última compra se ha vendido, y en cuántos días
+    surtidoraRotacion: { type: String, optional: true },
+    surtidoraRotacionParada: { type: Boolean, optional: true },
     // quién se lo llevó por última vez
     surtidoraUltimaVentaFecha: { type: String, optional: true },
     surtidoraUltimoCliente: { type: String, optional: true },

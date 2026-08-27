@@ -31,6 +31,17 @@
                 </span>
             </div>
 
+            <!--
+                Qué pasó con lo que se compró la vez pasada. Va pegado a la
+                última compra porque es el dato con el que se compara: si
+                sigue completo, no hay razón para recibir más.
+            -->
+            <div t-if="props.surtidoraRotacion"
+                 t-att-class="'o_surtidora_rotacion small px-2 pb-1 ' + (props.surtidoraRotacionParada ? 'text-danger fw-bold' : 'text-muted')">
+                <i class="fa fa-line-chart me-1" role="img" aria-label="Rotación"/>
+                <span t-out="props.surtidoraRotacion"/>
+            </div>
+
             <!-- Quién se lo llevó por última vez: ¿esto todavía se mueve? -->
             <div t-if="props.surtidoraUltimoCliente"
                  class="o_surtidora_ultima_venta text-muted small px-2 pb-1">
