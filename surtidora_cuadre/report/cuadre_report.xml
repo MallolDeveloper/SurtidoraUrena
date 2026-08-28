@@ -79,6 +79,16 @@
                                 <td class="text-end" t-out="d['fondo']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
                             <tr><td>Ventas en efectivo</td>
                                 <td class="text-end" t-out="d['ventas_efectivo']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
+                            <!--
+                                Va en su propia línea, aunque sea cero: el
+                                efectivo devuelto ya estaba restado dentro de
+                                "Ventas en efectivo", y al no verse la cajera
+                                lo volvía a restar mirando el bloque de
+                                Devoluciones. Aquí la resta queda a la vista y
+                                cuadra sola.
+                            -->
+                            <tr><td>Devoluciones en efectivo</td>
+                                <td class="text-end" t-out="d['devoluciones_efectivo']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
                             <tr><td>Entradas de caja</td>
                                 <td class="text-end" t-out="d['entradas']" t-options='{"widget": "monetary", "display_currency": moneda}'/></tr>
                             <tr><td>Salidas de caja</td>
@@ -166,6 +176,32 @@
                                     </tr>
                                 </tbody>
                             </table>
+                            <!--
+                                Sin este desglose el total de arriba mezcla
+                                dinero con papel: un bono o una nota de
+                                crédito no salen de la gaveta. La fila de
+                                efectivo da la MISMA cifra que "Devoluciones
+                                en efectivo" del bloque del efectivo, y por
+                                ahí se amarra el cuadre.
+                            -->
+                            <t t-if="d['devol_por_metodo']">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr><th colspan="3">Por forma de pago</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="d['devol_por_metodo']" t-as="dev">
+                                            <td t-esc="dev['nombre']"/>
+                                            <td class="text-muted">
+                                                <t t-if="dev['de_caja']">salió de la caja</t>
+                                                <t t-else="">no tocó la caja</t>
+                                            </td>
+                                            <td class="text-end" t-out="dev['monto']"
+                                                t-options='{"widget": "monetary", "display_currency": moneda}'/>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </t>
                         </t>
 
                         <table class="table table-borderless mt-5" style="width: 100%;">
