@@ -69,7 +69,15 @@ class AutorizarPrecioWizard(models.TransientModel):
                 'product_id': line.product_id.id,
                 'uom_id': line.product_uom_id.id,
                 'cantidad': line.product_uom_qty,
-                'precio_lista': wl.precio_lista,
+                # Del SERVIDOR, no de `wl.precio_lista`: el cliente web no
+                # devuelve los campos readonly al guardar —los descarta en
+                # `_getChanges`— así que la línea del asistente llegaba aquí
+                # con 0 y la auditoría congelaba un precio de lista que nunca
+                # existió (3 de 5 registros del asistente, en la base de
+                # pruebas). Quitar el readonly no bastaba: el parser del arch
+                # copia el del modelo al mismo sitio que el de la vista, y el
+                # descarte mira los dos igual.
+                'precio_lista': line._precio_de_lista(),
                 'precio_autorizado': line.price_reduce_taxinc,
                 # el costo del momento y el nombre del motivo, congelados:
                 # después no se pueden reconstruir
@@ -96,7 +104,12 @@ class AutorizarPrecioLinea(models.TransientModel):
     product_id = fields.Many2one(related='line_id.product_id', string='Producto')
     uom_id = fields.Many2one(related='line_id.product_uom_id', string='Unidad')
     cantidad = fields.Float(related='line_id.product_uom_qty', string='Cantidad')
-    precio_lista = fields.Monetary(currency_field='currency_id', string='Precio de lista', readonly=True)
+    # Los dos campos de abajo son SOLO para que el supervisor vea contra qué
+    # está autorizando; el readonly va en la vista, que es donde corresponde
+    # a un modificador de presentación. Ninguno de los dos alimenta ya un
+    # dato guardado: `action_autorizar` relee el precio de lista de la línea
+    # y RB-08 relee el bajo costo, ambos del servidor.
+    precio_lista = fields.Monetary(currency_field='currency_id', string='Precio de lista')
     # Lo que el cliente PAGA por unidad (precio menos descuento, con ITBIS),
     # no price_unit: el supervisor tiene que ver el número que va a autorizar.
     # Con price_unit veía 100.00 mientras la línea llevaba 99% de descuento.
@@ -106,4 +119,4 @@ class AutorizarPrecioLinea(models.TransientModel):
         related='line_id.price_reduce_taxinc', string='Precio propuesto',
         currency_field='currency_id')
     currency_id = fields.Many2one(related='line_id.currency_id')
-    bajo_costo = fields.Boolean(string='¡Bajo costo!', readonly=True)
+    bajo_costo = fields.Boolean(string='¡Bajo costo!')

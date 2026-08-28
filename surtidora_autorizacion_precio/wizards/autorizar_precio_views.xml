@@ -12,9 +12,19 @@
                         <field name="product_id"/>
                         <field name="uom_id"/>
                         <field name="cantidad"/>
-                        <field name="precio_lista"/>
+                        <!--
+                            Solo lectura como MODIFICADOR DE VISTA: son
+                            informativos, el supervisor no los teclea. No es
+                            lo que protege el dato — el cliente descarta los
+                            readonly al guardar, vengan del modelo o de aquí
+                            (`_getChanges` mira `activeFields[x].readonly`, y
+                            el parser del arch copia ahí el del modelo). Lo
+                            que garantiza la auditoría es que
+                            `action_autorizar` relee ambos del servidor.
+                        -->
+                        <field name="precio_lista" readonly="1"/>
                         <field name="precio_propuesto"/>
-                        <field name="bajo_costo" decoration-danger="bajo_costo"/>
+                        <field name="bajo_costo" readonly="1" decoration-danger="bajo_costo"/>
                         <field name="currency_id" column_invisible="1"/>
                     </list>
                 </field>
