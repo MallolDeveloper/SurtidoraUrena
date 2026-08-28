@@ -91,12 +91,16 @@ class PosSession(models.Model):
             [('session_id', '=', sesion.id),
              ('pos_order_id.state', 'in', ESTADOS_CAPTURADOS)],
             ['payment_method_id'], ['amount:sum'])
-        metodos = []
-        ventas_efectivo = 0.0
-        for metodo, monto in grupos:
-            metodos.append({'nombre': metodo.name, 'monto': monto})
-            if metodo.is_cash_count:
-                ventas_efectivo += monto
+        metodos = [{'nombre': metodo.name, 'monto': monto}
+                   for metodo, monto in grupos]
+
+        # El efectivo ENTRA por ventas y SALE por devoluciones. Sumar los dos
+        # con un solo `amount:sum` los cancela EN SILENCIO: el total salía
+        # correcto, pero rotulado «Ventas en efectivo», y la salida no
+        # figuraba en ninguna línea del bloque. La cajera solo la veía abajo,
+        # en Devoluciones, y la restaba otra vez a ojo — descuadre inventado.
+        ventas_efectivo, devoluciones_efectivo = \
+            self._surtidora_efectivo_por_signo(sesion)
 
         # devoluciones (por motivo si el módulo de devoluciones está)
         devoluciones = ordenes.filtered(lambda o: o.amount_total < 0)
@@ -111,6 +115,24 @@ class PosSession(models.Model):
             devol_por_motivo = [
                 {'motivo': motivo, 'cantidad': datos[0], 'monto': datos[1]}
                 for motivo, datos in sorted(por_motivo.items())]
+
+        # Lo devuelto, por forma de pago. Es lo que amarra la línea de
+        # «Devoluciones en efectivo» de arriba con este bloque, y lo que deja
+        # ver que un bono o una nota de crédito NO tocaron la gaveta: sin
+        # esto, el total mezcla dinero con papel y no cuadra contra nada.
+        # Se calcula sobre los pagos NEGATIVOS —no sobre las órdenes de total
+        # negativo— para que la parte en efectivo dé exactamente la misma
+        # cifra que el bloque del efectivo, incluso si una orden mezcla
+        # devolución y venta nueva.
+        grupos_devol = sesion.env['pos.payment']._read_group(
+            [('session_id', '=', sesion.id),
+             ('pos_order_id.state', 'in', ESTADOS_CAPTURADOS),
+             ('amount', '<', 0)],
+            ['payment_method_id'], ['amount:sum'])
+        devol_por_metodo = [
+            {'nombre': metodo.name, 'monto': monto,
+             'de_caja': metodo.is_cash_count}
+            for metodo, monto in grupos_devol]
 
         # quién cobró de verdad: la sesión la puede operar más de un cajero
         # y user_id solo dice quién la ABRIÓ (firma engañosa en la hoja)
@@ -150,6 +172,7 @@ class PosSession(models.Model):
             'contado_hecho': sesion.state in ('closed', 'closing_control'),
             'fondo': sesion.cash_register_balance_start,
             'ventas_efectivo': ventas_efectivo,
+            'devoluciones_efectivo': devoluciones_efectivo,
             'entradas': sum(m['monto'] for m in movimientos if m['monto'] > 0),
             'salidas': -sum(m['monto'] for m in movimientos if m['monto'] < 0),
             'esperado': sesion.cash_register_balance_end,
@@ -163,6 +186,7 @@ class PosSession(models.Model):
             'num_devoluciones': len(devoluciones),
             'monto_devoluciones': sum(devoluciones.mapped('amount_total')),
             'devol_por_motivo': devol_por_motivo,
+            'devol_por_metodo': devol_por_metodo,
             'movimientos': movimientos,
             'arqueo': arqueo,
             'total_arqueo': total_arqueo,
@@ -173,6 +197,32 @@ class PosSession(models.Model):
             and not moneda.is_zero(
                 total_arqueo - sesion.cash_register_balance_end_real),
         }
+
+    @api.model
+    def _surtidora_efectivo_por_signo(self, sesion):
+        """Lo que ENTRÓ y lo que SALIÓ de la gaveta, ya separados.
+
+        Un pago negativo en el POS es dinero que sale: no hay otra forma de
+        registrar una devolución en efectivo. El vuelto no cuenta aquí —
+        viaja en `amount_return`, no como línea de pago.
+
+        La salida se devuelve CON su signo (negativa, o cero), igual que los
+        montos de `devol_por_metodo` con los que tiene que amarrar. Así la
+        plantilla la imprime tal cual: negarla ahí daría `-0.0` en todos los
+        cuadres sin devoluciones, y la hoja saldría con un «-0.00».
+        """
+        base = [('session_id', '=', sesion.id),
+                ('pos_order_id.state', 'in', ESTADOS_CAPTURADOS),
+                ('payment_method_id.is_cash_count', '=', True)]
+
+        def sumar(signo):
+            # groupby vacío: una sola fila con el total, o ninguna si no hay
+            # pagos de ese signo (y `amount:sum` puede venir en None)
+            grupos = sesion.env['pos.payment']._read_group(
+                base + [('amount', signo, 0)], [], ['amount:sum'])
+            return (grupos[0][0] if grupos else 0.0) or 0.0
+
+        return sumar('>'), sumar('<')
 
     @api.model
     def _surtidora_movimientos_caja(self, sesion):
