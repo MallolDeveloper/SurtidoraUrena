@@ -198,6 +198,32 @@ class PosSession(models.Model):
                 total_arqueo - sesion.cash_register_balance_end_real),
         }
 
+    # ------------------------------------------------------------------
+    # La pantalla de cierre
+    # ------------------------------------------------------------------
+    def get_closing_control_data(self):
+        """Manda al popup de cierre las DOS mitades del efectivo, no el neto.
+
+        El core resume ventas y devoluciones en un solo `payment_amount`, y
+        la plantilla esconde esa fila cuando da cero. Una venta devuelta
+        completa deja la pantalla igual que si no hubiera pasado nada: la
+        cajera cuenta la gaveta sin enterarse de que salió dinero.
+
+        Es el mismo arreglo que la hoja impresa, pero en la pantalla donde
+        se cuenta de verdad. Aquí NO se toca ningún importe del core: el
+        esperado, el contado y la diferencia los sigue calculando Odoo.
+        """
+        datos = super().get_closing_control_data()
+        efectivo = datos.get('default_cash_details')
+        # len(self) == 1: si algún día esto se llamara sobre varias sesiones,
+        # mejor dejar la pantalla nativa intacta que reventarla por un dato
+        # informativo
+        if efectivo and len(self) == 1:
+            ventas, devoluciones = self._surtidora_efectivo_por_signo(self)
+            efectivo['surtidora_ventas'] = ventas
+            efectivo['surtidora_devoluciones'] = devoluciones
+        return datos
+
     @api.model
     def _surtidora_efectivo_por_signo(self, sesion):
         """Lo que ENTRÓ y lo que SALIÓ de la gaveta, ya separados.

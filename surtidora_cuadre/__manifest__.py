@@ -30,11 +30,17 @@ Este módulo lo replica sobre la sesión del POS:
 - El conteo por denominación del popup de cierre se PERSISTE estructurado
   (campo JSON en la sesión): el POS nativo solo lo dejaba como texto en las
   notas de cierre, imposible de tabular en un reporte.
+- La PANTALLA de cierre también enseña las dos mitades. El core resume
+  ventas y devoluciones en un solo `payment_amount` y esconde esa fila
+  cuando da cero, así que una venta devuelta completa dejaba la pantalla
+  idéntica a un día sin movimiento: la cajera contaba la gaveta sin saber
+  que había salido dinero. Es el mismo arreglo que la hoja impresa, pero
+  donde se cuenta de verdad; ningún importe del core se toca.
 
 El motor arma todos los datos (surtidora_datos_cuadre); la plantilla solo
 pinta — mismo estándar motor/pantalla del resto de módulos Surtidora.
     """,
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
