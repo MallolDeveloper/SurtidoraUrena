@@ -241,14 +241,26 @@ class PosOrder(models.Model):
         de cobrar: en ese momento la orden todavía no existe. Sin este enlace
         la bitácora no distingue una devolución real de una que se autorizó y
         después se abandonó.
+
+        Solo se ata la CONSUMIDA. Una autorización sirve para una devolución:
+        si la cajera pide la clave, abandona y la vuelve a pedir, quedan dos
+        filas y solo la segunda se cobró. Atándolas todas, la abandonada
+        aparecía como cobrada —tapando justo el filtro «Autorizadas sin
+        cobrar», que existe para cazar eso— y la columna de monto, que va
+        sumada en la lista, contaba el dinero dos veces.
         """
         Autorizacion = self.env['surtidora.autorizacion.devolucion'].sudo()
         for orden in self:
             referencias = [r for r in (orden.pos_reference, orden.name) if r]
             if not referencias:
                 continue
+            # `_surtidora_autorizacion_para` ya la marcó consumida durante el
+            # sync, justo antes de este create, así que aquí hay exactamente
+            # una. Sin `limit`: si algún día hubiera dos, que se vea en la
+            # bitácora en vez de quedar una silenciosamente fuera.
             filas = Autorizacion.search([
                 ('pos_order_id', '=', False),
+                ('consumida', '=', True),
                 ('order_ref', 'in', referencias),
             ])
             if filas:
