@@ -116,6 +116,12 @@ class ResUsers(models.Model):
         """Devuelve el usuario autorizador (grupo Autorizador de Precios) cuyo
         PIN coincide, o un recordset vacío si nadie coincide.
 
+        Solo cuentan los autorizadores que tienen acceso a la compañía en la
+        que se está autorizando: sin ese filtro, con más de una compañía
+        activa el PIN de un supervisor ajeno abre la caja o la rebaja de
+        precio de una compañía que no es la suya, y la bitácora lo registra
+        como si tuviera potestad.
+
         Lanza UserError si quien lo pide está bloqueado por intentos fallidos.
         """
         solicitante = self.env.user
@@ -126,8 +132,13 @@ class ResUsers(models.Model):
             raise UserError(_(
                 'Demasiados intentos con un PIN incorrecto. Vuelva a '
                 'intentarlo en %s minuto(s).') % minutos)
+        # `company_ids` (las permitidas), no `company_id` (la de por defecto):
+        # un supervisor habilitado en las dos compañías debe poder autorizar
+        # en ambas, no solo en la que tenga puesta.
+        compania = self.env.company
         autorizadores = self.env.ref(
-            'surtidora_autorizacion_precio.group_autorizador_precio').sudo().user_ids
+            'surtidora_autorizacion_precio.group_autorizador_precio'
+        ).sudo().user_ids.filtered(lambda u: compania in u.company_ids)
         for user in autorizadores:
             if user.surtidora_pin_hash and _pin_crypt.verify(
                     pin.strip(), user.surtidora_pin_hash):
