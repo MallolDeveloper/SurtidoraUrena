@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!--
+        La pantalla de cierre no enseñaba el dinero devuelto.
+
+        El core manda un solo `payment_amount` con las ventas y las
+        devoluciones ya sumadas, y pinta esa fila así:
+
+            <div t-if="props.default_cash_details.payment_amount" ...>
+                <span>Payments in <t t-esc="...name"/></span>
+                <span t-esc="...formatCurrency(Math.abs(payment_amount))"/>
+
+        Tres problemas encima del otro:
+
+        1. Netea: una venta de 7,900.13 devuelta completa da 0.
+        2. El `t-if` esconde la fila entera cuando da 0, así que la pantalla
+           queda idéntica a un día en que no pasó nada. La cajera cuenta sin
+           saber que salió dinero de la gaveta.
+        3. `Math.abs` — en un día flojo con una devolución grande el neto
+           queda negativo y lo pintaría EN POSITIVO: dinero que se muestra
+           como entrado cuando en realidad salió.
+
+        Se sustituye por las dos mitades, que es lo que hay que cuadrar. El
+        esperado, el contado y la diferencia los sigue calculando Odoo: aquí
+        solo se hace visible de dónde sale el número.
+
+        Si el core cambiara ese `div`, el xpath falla al instalar y se ve —
+        preferible a que la fila vuelva a mentir en silencio.
+    -->
+    <t t-name="surtidora_cuadre.ClosePosPopup"
+       t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
+        <xpath expr="//div[@t-if='props.default_cash_details.payment_amount']"
+               position="replace">
+            <!--
+                Se enseñan las dos juntas o ninguna: media resta a la vista
+                confunde más que la resta entera. Un día sin movimiento de
+                efectivo se queda tan limpio como hoy.
+            -->
+            <t t-set="surtiVentas" t-value="props.default_cash_details.surtidora_ventas or 0"/>
+            <t t-set="surtiDevoluciones" t-value="props.default_cash_details.surtidora_devoluciones or 0"/>
+            <div t-if="surtiVentas or surtiDevoluciones"
+                 class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span>Ventas en efectivo</span>
+                <span class="align-top" t-esc="env.utils.formatCurrency(surtiVentas)"/>
+            </div>
+            <div t-if="surtiDevoluciones"
+                 class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span>Devoluciones en efectivo</span>
+                <span class="align-top" t-esc="env.utils.formatCurrency(surtiDevoluciones)"/>
+            </div>
+        </xpath>
+    </t>
+
+</templates>
