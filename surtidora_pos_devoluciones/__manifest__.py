@@ -25,11 +25,18 @@ y se elige de un catálogo. Este módulo replica ese control en el POS:
 El pago de la devolución ya lo cubre surtidora_pos_credito: el método
 "Bono / Nota de Crédito" emite el bono nominativo (política 12.4).
 
+- El botón "Reembolsar" del core se planta EN SILENCIO cuando no se tecleó
+  cantidad en ninguna línea (`if (!order || !this.getHasItemsToRefund())
+  return;`), y solo se autocompleta si la venta tiene un artículo de una
+  unidad — así que el fallo se siente aleatorio. Ahora avisa qué falta, y
+  distingue "teclee la cantidad" de "esta venta ya se devolvió completa",
+  que manda a la cajera a sitios opuestos.
+
 NO se rutea mercancía al almacén de Dañados automáticamente: en ADG el
 almacén de la devolución va en blanco y dañados/vencidos son ~12 casos al
 año — eso se resuelve con un traspaso interno manual.
     """,
-    'version': '19.0.2.0.2',
+    'version': '19.0.2.1.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
