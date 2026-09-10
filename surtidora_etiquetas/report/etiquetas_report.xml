@@ -35,7 +35,22 @@
                         RD$ <t t-esc="'%.2f' % e['precio']"/>
                     </div>
                     <t t-if="e['barcode']">
-                        <img t-att-src="'/report/barcode/?barcode_type=EAN13&amp;value=%s&amp;width=400&amp;height=60&amp;humanreadable=1' % e['barcode']"
+                        <!-- `auto`, no una simbología fija. Odoo mira el largo:
+                             13 -> EAN-13, 8 -> EAN-8, cualquier otro -> Code128;
+                             y si el dígito verificador no cuadra también cae a
+                             Code128, que encoda el número tal cual. Así los 22
+                             EAN-8 del catálogo (cigarrillos, cervezas) salen en
+                             su simbología, más estrecha en 48mm, en vez de un
+                             Code128 largo.
+
+                             OJO: NO poner `UPCA` para los 706 códigos de 12
+                             dígitos. Odoo convierte UPCA a EAN-13 ANTEPONIENDO
+                             UN CERO (ir_actions_report.py), así que imprimiría
+                             0028661704211 — trece dígitos que no existen en la
+                             ficha y que al escanear no encuentran el producto.
+                             Con `auto` esos 12 dígitos salen en Code128, exactos.
+                             Verificado comparando las imágenes byte a byte. -->
+                        <img t-att-src="'/report/barcode/?barcode_type=auto&amp;value=%s&amp;width=400&amp;height=60&amp;humanreadable=1' % e['barcode']"
                              style="width: 48mm; height: 9mm;"/>
                     </t>
                     <t t-else="">
