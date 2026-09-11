@@ -66,6 +66,12 @@ patch(Orderline.prototype, {
             efectivo * empaque.factor,
             linea.currency.id
         )} / ${empaque.uom.name}`;
+        // La decisión "esta línea se presenta como N de ESTE empaque" queda
+        // expuesta para quien pinte el recibo (surtidora_pos_tirilla la usa
+        // para rotular la línea). Vive aquí y no allá porque la regla de
+        // cuándo una línea se puede presentar como empaque es de este módulo,
+        // y duplicarla en la tirilla sería tener dos verdades.
+        vals.surtidoraEmpaque = empaque.uom.name;
         return vals;
     },
 });

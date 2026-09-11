@@ -27,6 +27,20 @@
         </xpath>
     </t>
 
+    <!-- Debajo de cada línea, SOLO el empaque y en negrita (ver
+         unidad_linea.js). Va dentro de la lista de detalle, que en el recibo
+         el núcleo pinta al 75 %: el 133 % la devuelve al tamaño de la línea,
+         que es lo que hace que el despachador la vea. -->
+    <t t-name="surtidora_pos_tirilla.Orderline"
+       t-inherit="point_of_sale.Orderline" t-inherit-mode="extension">
+        <xpath expr="//li[hasclass('price-per-unit')][1]" position="after">
+            <li t-if="vals.surtidoraUnidad" class="surti-unidad fw-bolder"
+                style="font-size: 133%;">
+                <t t-esc="vals.surtidoraUnidad"/>
+            </li>
+        </xpath>
+    </t>
+
     <t t-name="surtidora_pos_tirilla.OrderReceipt"
        t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
         <!-- "Devuelta", como se dice en el mostrador -->
