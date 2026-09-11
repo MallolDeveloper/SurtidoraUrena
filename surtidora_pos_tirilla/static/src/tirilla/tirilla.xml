@@ -108,7 +108,11 @@
             </div>
         </xpath>
         <!-- Sin «Con la tecnología de Odoo»: es la factura de Surtidora. No
-             hay ajuste para quitarlo; está clavado en la plantilla. -->
-        <xpath expr="//div[hasclass('footer-powered-by')]" position="replace"/>
+             hay ajuste para quitarlo; está clavado en la plantilla.
+             Se ancla por el TEXTO del span y no por clase: el build de marzo
+             de 2026 no tiene el div.footer-powered-by que trae el fuente
+             actual, y anclar ahí tumbaba el recibo entero ("cannot be
+             located"). El texto «Powered by» está igual en los dos builds. -->
+        <xpath expr="//span[contains(text(),'Powered by')]/.." position="replace"/>
     </t>
 </templates>
