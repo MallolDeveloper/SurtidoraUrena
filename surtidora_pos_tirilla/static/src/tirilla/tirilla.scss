@@ -1,13 +1,52 @@
-// Cómo se ve el tipo de empaque debajo de cada línea de la tirilla.
+// Estilos de la tirilla del mostrador. Solo dentro del recibo (.pos-receipt):
+// el carrito y las demás pantallas no llevan nada de esto.
 //
-// Es un código visual para el despachador, pedido por el cliente el
-// 11-sep-2026 con la tirilla impresa al lado de la de ADG: que de un vistazo
-// distinga paquete, docena y caja. La regla de negocio (qué tipo es cada
-// línea) vive en unidad_linea.js; aquí solo el estilo, así resaltar un tipo
-// nuevo —Fardo, por ejemplo, que son 331 productos— es una línea.
-//
-// Solo aplica dentro del recibo (.pos-receipt): el carrito no lleva este
-// renglón.
+// La regla de negocio (qué tipo de empaque es cada línea, qué título lleva la
+// venta, cuántos renglones hay) vive en el JS; aquí solo cómo se ve.
+
+// ---------------------------------------------------------------------------
+// Cabecera: título de la venta, número grande y código de barras (ADG)
+// ---------------------------------------------------------------------------
+.pos-receipt .surti-titulo-venta {
+    font-weight: bold;
+    letter-spacing: 0.04em;
+}
+
+// el número de la venta, grande, para leerlo de lejos y teclearlo si el
+// lector falla
+.pos-receipt .surti-referencia {
+    font-size: 170%;
+    font-weight: bold;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+}
+
+.pos-receipt .surti-codigo-barras {
+    display: block;
+    margin: 2px auto 0;
+    width: 220px;   // ver ANCHO_CODIGO_BARRAS en recibo.js
+    height: 44px;
+}
+
+.pos-receipt .surti-cliente-codigo {
+    font-weight: bold;
+}
+
+// ---------------------------------------------------------------------------
+// Antes de las líneas
+// ---------------------------------------------------------------------------
+.pos-receipt .surti-almacen {
+    font-weight: bold;
+    padding-bottom: 4px;
+}
+
+// ---------------------------------------------------------------------------
+// Debajo de cada línea: tipo de empaque a la izquierda, ITBIS a la derecha
+// ---------------------------------------------------------------------------
+// Código visual para el despachador, pedido por el cliente el 11-sep-2026
+// con la tirilla impresa al lado de la de ADG: que de un vistazo distinga
+// caja, paquete y docena. Resaltar un tipo nuevo —Fardo, por ejemplo, que
+// son 331 productos— es una línea aquí.
 .pos-receipt .surti-unidad {
     // la lista de detalle va al 75 % en el recibo; esto la devuelve al
     // tamaño de la línea, que es lo que hace que se vea
@@ -20,7 +59,7 @@
 // caja: negrita y con un asterisco delante — «*CAJA». El asterisco es la
 // marca que el despachador busca; va como contenido del estilo y no en el
 // dato, para que lo que se guarda y lo que lee otro sistema siga siendo
-// «Caja» (afinado por el cliente el 11-sep-2026).
+// «Caja».
 .pos-receipt .surti-unidad-caja {
     font-weight: bold;
     &::before {
@@ -34,3 +73,17 @@
 }
 
 // paquete, unidad, fardo y el resto: letra normal (regla general de arriba)
+
+// el ITBIS de la línea, discreto y alineado a la derecha como los importes
+.pos-receipt .surti-itbis {
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+// ---------------------------------------------------------------------------
+// Totales
+// ---------------------------------------------------------------------------
+.pos-receipt .surti-items {
+    font-weight: bold;
+    padding-top: 6px;
+}

@@ -1,5 +1,6 @@
 import { patch } from "@web/core/utils/patch";
 import { Orderline } from "@point_of_sale/app/components/orderline/orderline";
+import { formatCurrency } from "@web/core/currency";
 
 /**
  * Debajo de cada línea de la tirilla va SOLO el tipo de empaque.
@@ -30,6 +31,12 @@ import { Orderline } from "@point_of_sale/app/components/orderline/orderline";
  * en `vals.surtidoraEmpaque` y no se recalcula aquí — por eso el módulo
  * depende de empaques, para que su parche corra antes.
  *
+ * EL ITBIS DE LA LÍNEA va en ese mismo renglón, a la derecha, como la
+ * columna ITBIS de la factura de ADG. Sale de `priceIncl - priceExcl`, que
+ * son los importes redondeados globalmente por el núcleo — los mismos que
+ * suman al total— y no de multiplicar una tasa, que redondearía distinto y
+ * un día no cuadraría con el pie.
+ *
  * Solo en el recibo. Carrito y reembolsos conservan el renglón nativo.
  */
 
@@ -55,7 +62,13 @@ patch(Orderline.prototype, {
         );
         vals.surtidoraUnidad = tipo;
         vals.surtidoraUnidadClase = tipo ? `surti-unidad-${claseDe(tipo)}` : "";
-        // sin el renglón de precio: el empaque va solo
+        // con signo: en una devolución el ITBIS también va en negativo.
+        // Redondeado a la moneda para que un exento no imprima «RD$ 0.00»
+        // por un residuo de coma flotante.
+        const moneda = this.line.currency;
+        const itbis = moneda.round(this.line.priceIncl - this.line.priceExcl);
+        vals.surtidoraItbis = itbis ? formatCurrency(itbis, moneda.id) : "";
+        // sin el renglón de precio: el empaque y el ITBIS van solos
         vals.displayPriceUnit = false;
         return vals;
     },

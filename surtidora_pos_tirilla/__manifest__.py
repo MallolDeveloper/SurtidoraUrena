@@ -32,6 +32,29 @@ cliente conoce (captura 20 de ADG):
   (el servidor lo asigna en ese momento; sin el refresh, todas las tirillas
   del día dirían "Cuadre No.: /" hasta un F5).
 
+Lo que trae la factura de ADG y el recibo nativo no (11-sep-2026, con las
+dos impresas al lado):
+
+- Título «FACTURA A CONTADO» o «FACTURA A CRÉDITO». Crédito = se pagó con
+  un método que difiere el cobro y no es bono, la misma regla con la que
+  surtidora_pos_credito mide el crédito de la sesión.
+- El número de la venta grande y en código de barras Code128, para
+  escanear el recibo en una devolución en vez de teclearlo.
+- «Almacén: …» antes de las líneas; el nombre viaja resuelto desde el
+  servidor (pos_config.py), porque el POS no carga stock.warehouse.
+- El código del cliente delante del nombre (res_partner.py lo suma a los
+  campos que carga el POS) y su teléfono.
+- El ITBIS de cada línea, a la derecha del tipo de empaque, sacado de los
+  importes redondeados por el núcleo y no de multiplicar una tasa.
+- «ITEMS: N» delante de los totales: renglones, no unidades.
+- Sin «Con la tecnología de Odoo».
+
+Lo que NO trae todavía, con su motivo: ORIGINAL/COPIA (Odoo 19 ya no
+cuenta las impresiones; hace falta un contador propio), Vendedor distinto
+del cajero (el POS no tiene ese campo; es decisión del cliente), puntos de
+lealtad (no hay programa de puntos configurado; el de ADG hay que
+definirlo), y el NCF/QR fiscal (proveedor de e-CF).
+
 Los datos de la compañía se cargan en la ficha (RNC 130728526 tomado de la
 base real de ADG). El NCF/e-CF en la tirilla queda para la sesión fiscal —
 depende del proveedor de e-CF, aún sin identificar.
@@ -39,7 +62,7 @@ depende del proveedor de e-CF, aún sin identificar.
 La conexión física con la impresora (ePOS/IoT Box) es configuración del
 puesto en sitio, no de este módulo.
     """,
-    'version': '19.0.1.2.1',
+    'version': '19.0.1.3.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
