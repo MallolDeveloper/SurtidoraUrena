@@ -26,6 +26,29 @@ import { useBarcodeReader } from "@point_of_sale/app/hooks/barcode_reader_hook";
  * quedan como si la cajera lo hubiera tecleado. Si aparece exactamente esa
  * venta, la selecciona; si no, deja la lista filtrada y a la vista.
  */
+/**
+ * Lo que escribe el lector, llevado a la forma guardada «265-1-000003».
+ *
+ * Un lector en modo teclado emula un teclado AMERICANO y Windows le aplica
+ * la distribución activa: en la latinoamericana la tecla que en US es «-»
+ * escribe «'», así que el mismo código de barras llega como 265'1'000003 y
+ * la búsqueda literal no encuentra nada (11-sep-2026, con el lector en
+ * mano: «No orders found» con la tirilla recién impresa). Los dígitos son
+ * iguales en todas las distribuciones; el separador no. Por eso cualquier
+ * tramo que no sea dígito se lee como el guion de la referencia.
+ */
+function referenciaDe(texto) {
+    return String(texto || "")
+        .trim()
+        .replace(/[^0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+/** «265-1-000003» y «265'1'000003» son la misma venta. */
+function mismaReferencia(a, b) {
+    return referenciaDe(a) === referenciaDe(b);
+}
+
 patch(TicketScreen.prototype, {
     setup() {
         super.setup(...arguments);
@@ -35,7 +58,7 @@ patch(TicketScreen.prototype, {
     },
 
     async _surtidoraBuscarRecibo(codigo) {
-        const referencia = String(codigo.base_code || codigo.code || "").trim();
+        const referencia = referenciaDe(codigo.base_code || codigo.code);
         if (!referencia) {
             return;
         }
@@ -44,8 +67,8 @@ patch(TicketScreen.prototype, {
         await this.onSearch({ fieldName: "RECEIPT_NUMBER", searchTerm: referencia });
         // exacta, no difusa: es la referencia del papel, no lo que alguien
         // recuerda a medias
-        const venta = this.pos.models["pos.order"].find(
-            (orden) => orden.pos_reference === referencia
+        const venta = this.pos.models["pos.order"].find((orden) =>
+            mismaReferencia(orden.pos_reference, referencia)
         );
         if (venta) {
             this.onClickOrder(venta);
