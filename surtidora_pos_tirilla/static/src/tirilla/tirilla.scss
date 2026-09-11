@@ -17,15 +17,20 @@
     text-transform: uppercase;   // CAJA, PAQUETE, DOCENA — como en ADG
 }
 
-// paquete: negrita
-.pos-receipt .surti-unidad-paquete {
+// caja: negrita y con un asterisco delante — «*CAJA». El asterisco es la
+// marca que el despachador busca; va como contenido del estilo y no en el
+// dato, para que lo que se guarda y lo que lee otro sistema siga siendo
+// «Caja» (afinado por el cliente el 11-sep-2026).
+.pos-receipt .surti-unidad-caja {
     font-weight: bold;
+    &::before {
+        content: "*";
+    }
 }
 
-// docena: negrita y cursiva
+// docena: cursiva, sin negrita
 .pos-receipt .surti-unidad-docena {
-    font-weight: bold;
     font-style: italic;
 }
 
-// caja, unidad, fardo y el resto: letra normal (regla general de arriba)
+// paquete, unidad, fardo y el resto: letra normal (regla general de arriba)
