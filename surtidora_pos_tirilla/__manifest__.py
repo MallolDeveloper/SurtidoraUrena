@@ -13,11 +13,14 @@ cliente conoce (captura 20 de ADG):
   cabeza). El pie ADG "Caja / Cajero / Cuadre No." REEMPLAZA ese bloque
   nativo — sin duplicados y el pie queda al final, como en la captura 20.
 - "Devuelta" en vez de "Cambio" (así se dice en el mostrador).
-- Debajo de cada línea, SOLO el empaque —«Caja de 8», «Paquete de 60»,
-  «Unidad»— en negrita y a tamaño de línea, sin el precio por empaque. La
-  tirilla la lee el despachador y lo que tiene que ver de un vistazo es qué
-  empaque va, no a cuánto sale (11-sep-2026, con la tirilla impresa al lado
-  de la de ADG). Qué empaque rotular lo decide surtidora_pos_empaques.
+- Debajo de cada línea, SOLO el TIPO de empaque —CAJA, PAQUETE, DOCENA,
+  UNIDAD— a tamaño de línea, sin el precio por empaque y sin el "de 60
+  (Paquete)". La tirilla la lee el despachador y lo que tiene que ver de un
+  vistazo es qué empaque va; cuántos trae ya lo dice el nombre del producto
+  (11-sep-2026, con la tirilla impresa al lado de la de ADG). Cada tipo lleva
+  su estilo como código visual: PAQUETE en negrita, DOCENA en negrita
+  cursiva, el resto normal (tirilla.scss). Qué empaque rotular lo decide
+  surtidora_pos_empaques.
 - El "Atendido por" se retira de las ventas (el cajero va al pie), pero se
   CONSERVA en el comprobante de entrada/salida de efectivo — era su única
   mención del responsable.
@@ -36,7 +39,7 @@ depende del proveedor de e-CF, aún sin identificar.
 La conexión física con la impresora (ePOS/IoT Box) es configuración del
 puesto en sitio, no de este módulo.
     """,
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
