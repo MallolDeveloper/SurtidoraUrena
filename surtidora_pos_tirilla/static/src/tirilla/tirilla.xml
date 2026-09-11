@@ -17,6 +17,30 @@
                 <div t-if="order.company.phone">Tel: <t t-esc="order.company.phone"/></div>
             </div>
         </xpath>
+        <!-- Como en la factura de ADG: el título dice CÓMO se vendió (contado
+             o crédito) y debajo va el número de la venta grande y en código
+             de barras, para escanear el recibo en una devolución en vez de
+             teclearlo. Los valores los calcula recibo.js. -->
+        <xpath expr="//span[hasclass('pos-receipt-vat')]/.." position="before">
+            <div t-if="order.pos_reference" class="surti-titulo text-center pt-2">
+                <div class="surti-titulo-venta" t-esc="surtidoraTitulo"/>
+                <div class="surti-referencia" t-esc="order.pos_reference"/>
+                <img t-if="surtidoraCodigoBarras" t-att-src="surtidoraCodigoBarras"
+                     class="surti-codigo-barras" alt=""/>
+            </div>
+        </xpath>
+        <!-- El cliente con su código delante, como lo conoce él y como sale en
+             su estado de cuenta; y su teléfono, que el nativo carga pero no
+             imprime. -->
+        <xpath expr="//div[hasclass('pos-receipt-customer')]//span[@t-esc='order.partner_id.name']"
+               position="before">
+            <span t-if="order.partner_id.ref" class="surti-cliente-codigo">
+                <t t-esc="order.partner_id.ref"/> ·
+            </span>
+        </xpath>
+        <xpath expr="//div[hasclass('pos-receipt-customer')]/div[last()]" position="after">
+            <div t-if="order.partner_id.phone">Tel: <t t-esc="order.partner_id.phone"/></div>
+        </xpath>
         <!-- En VENTAS el cajero va al pie (estilo ADG); en el comprobante de
              cash in/out se conserva aquí — era su única mención del
              responsable, con nombre completo. -->
@@ -27,21 +51,42 @@
         </xpath>
     </t>
 
-    <!-- Debajo de cada línea, SOLO el tipo de empaque: CAJA, PAQUETE, DOCENA…
-         (ver unidad_linea.js). Cómo se ve cada tipo lo decide tirilla.scss por
-         la clase surti-unidad-<tipo>; aquí no hay estilo. -->
+    <!-- Debajo de cada línea, SOLO el tipo de empaque —CAJA, PAQUETE, DOCENA…—
+         y a la derecha el ITBIS de la línea (ver unidad_linea.js). Cómo se ve
+         cada tipo lo decide tirilla.scss por la clase surti-unidad-<tipo>;
+         aquí no hay estilo. El tipo va en su propio span para que el estilo
+         del tipo (negrita, cursiva, el asterisco) no se contagie al ITBIS. -->
     <t t-name="surtidora_pos_tirilla.Orderline"
        t-inherit="point_of_sale.Orderline" t-inherit-mode="extension">
         <xpath expr="//li[hasclass('price-per-unit')][1]" position="after">
-            <li t-if="vals.surtidoraUnidad"
-                t-attf-class="surti-unidad {{ vals.surtidoraUnidadClase }}">
-                <t t-esc="vals.surtidoraUnidad"/>
+            <li t-if="vals.surtidoraUnidad" class="surti-detalle d-flex justify-content-between">
+                <span t-attf-class="surti-unidad {{ vals.surtidoraUnidadClase }}">
+                    <t t-esc="vals.surtidoraUnidad"/>
+                </span>
+                <span t-if="vals.surtidoraItbis" class="surti-itbis">
+                    ITBIS <t t-esc="vals.surtidoraItbis"/>
+                </span>
             </li>
         </xpath>
     </t>
 
     <t t-name="surtidora_pos_tirilla.OrderReceipt"
        t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+        <!-- El almacén que despacha, antes de las líneas, como en ADG
+             («Almacén: 1 - PRINCIPAL»). Llega resuelto desde el servidor
+             (pos_config.py). -->
+        <xpath expr="//OrderDisplay" position="before">
+            <div t-if="order.config.surtidora_almacen" class="surti-almacen">
+                Almacén: <t t-esc="order.config.surtidora_almacen"/>
+            </div>
+        </xpath>
+        <!-- «ITEMS: 16» delante de los totales, como en ADG: renglones, no
+             unidades (recibo.js). -->
+        <xpath expr="//div[hasclass('pos-receipt-taxes')]" position="before">
+            <div class="surti-items pos-receipt-amount">
+                <span>ITEMS: <t t-esc="surtidoraItems"/></span>
+            </div>
+        </xpath>
         <!-- "Devuelta", como se dice en el mostrador -->
         <xpath expr="//span[hasclass('label-change')]" position="replace">
             <span class="label-change">Devuelta</span>
@@ -62,5 +107,8 @@
                 <div>Cuadre No.: <t t-esc="order.surtidora_cuadre || (order.session_id ? order.session_id.name : '')"/></div>
             </div>
         </xpath>
+        <!-- Sin «Con la tecnología de Odoo»: es la factura de Surtidora. No
+             hay ajuste para quitarlo; está clavado en la plantilla. -->
+        <xpath expr="//div[hasclass('footer-powered-by')]" position="replace"/>
     </t>
 </templates>
