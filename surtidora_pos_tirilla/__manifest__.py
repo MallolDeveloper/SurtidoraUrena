@@ -47,11 +47,13 @@ dos impresas al lado):
 - El ITBIS de cada línea, a la derecha del tipo de empaque, sacado de los
   importes redondeados por el núcleo y no de multiplicar una tasa.
 - «ITEMS: N» delante de los totales: renglones, no unidades.
+- «Vendedor» en el pie: el comercial del pedido de origen si la venta viene
+  de un pedido (pos_sale), y si no, el cajero — regla del cliente: «si la
+  orden la crea el vendedor se atribuye a él; si no, al cajero».
 - Sin «Con la tecnología de Odoo».
 
 Lo que NO trae todavía, con su motivo: ORIGINAL/COPIA (Odoo 19 ya no
-cuenta las impresiones; hace falta un contador propio), Vendedor distinto
-del cajero (el POS no tiene ese campo; es decisión del cliente), puntos de
+cuenta las impresiones; hace falta un contador propio), puntos de
 lealtad (no hay programa de puntos configurado; el de ADG hay que
 definirlo), y el NCF/QR fiscal (proveedor de e-CF).
 
@@ -62,13 +64,15 @@ depende del proveedor de e-CF, aún sin identificar.
 La conexión física con la impresora (ePOS/IoT Box) es configuración del
 puesto en sitio, no de este módulo.
     """,
-    'version': '19.0.1.3.2',
+    'version': '19.0.1.4.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
     # surtidora_pos_empaques va antes: su parche decide en qué empaque se
     # presenta la línea, y el de aquí lo lee (unidad_linea.js).
-    'depends': ['point_of_sale', 'surtidora_pos_empaques'],
+    # pos_sale: la línea del POS guarda el pedido de origen (sale_order_origin_id),
+    # de ahí sale el vendedor.
+    'depends': ['point_of_sale', 'pos_sale', 'surtidora_pos_empaques'],
     'assets': {
         'point_of_sale._assets_pos': [
             'surtidora_pos_tirilla/static/src/**/*',

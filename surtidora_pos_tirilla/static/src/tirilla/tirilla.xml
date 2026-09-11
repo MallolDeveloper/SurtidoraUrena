@@ -104,6 +104,10 @@
             <div class="surti-pie-tirilla text-center fw-bolder pt-3">
                 <div>Caja: <t t-esc="order.surtidora_caja || order.config.name"/></div>
                 <div>Cajero: <t t-esc="order.surtidora_cajero || (order.user_id ? order.user_id.name : '')"/></div>
+                <!-- vendedor = comercial del pedido de origen, o el cajero si la
+                     venta nació en el mostrador (pos_order.py); el fallback
+                     cubre la orden local recién creada -->
+                <div>Vendedor: <t t-esc="order.surtidora_vendedor || order.surtidora_cajero || (order.user_id ? order.user_id.name : '')"/></div>
                 <div>Cuadre No.: <t t-esc="order.surtidora_cuadre || (order.session_id ? order.session_id.name : '')"/></div>
             </div>
         </xpath>
