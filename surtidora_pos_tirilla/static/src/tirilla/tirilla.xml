@@ -27,15 +27,14 @@
         </xpath>
     </t>
 
-    <!-- Debajo de cada línea, SOLO el empaque y en negrita (ver
-         unidad_linea.js). Va dentro de la lista de detalle, que en el recibo
-         el núcleo pinta al 75 %: el 133 % la devuelve al tamaño de la línea,
-         que es lo que hace que el despachador la vea. -->
+    <!-- Debajo de cada línea, SOLO el tipo de empaque: CAJA, PAQUETE, DOCENA…
+         (ver unidad_linea.js). Cómo se ve cada tipo lo decide tirilla.scss por
+         la clase surti-unidad-<tipo>; aquí no hay estilo. -->
     <t t-name="surtidora_pos_tirilla.Orderline"
        t-inherit="point_of_sale.Orderline" t-inherit-mode="extension">
         <xpath expr="//li[hasclass('price-per-unit')][1]" position="after">
-            <li t-if="vals.surtidoraUnidad" class="surti-unidad fw-bolder"
-                style="font-size: 133%;">
+            <li t-if="vals.surtidoraUnidad"
+                t-attf-class="surti-unidad {{ vals.surtidoraUnidadClase }}">
                 <t t-esc="vals.surtidoraUnidad"/>
             </li>
         </xpath>

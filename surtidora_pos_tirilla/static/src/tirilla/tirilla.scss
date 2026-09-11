@@ -1,0 +1,31 @@
+// Cómo se ve el tipo de empaque debajo de cada línea de la tirilla.
+//
+// Es un código visual para el despachador, pedido por el cliente el
+// 11-sep-2026 con la tirilla impresa al lado de la de ADG: que de un vistazo
+// distinga paquete, docena y caja. La regla de negocio (qué tipo es cada
+// línea) vive en unidad_linea.js; aquí solo el estilo, así resaltar un tipo
+// nuevo —Fardo, por ejemplo, que son 331 productos— es una línea.
+//
+// Solo aplica dentro del recibo (.pos-receipt): el carrito no lleva este
+// renglón.
+.pos-receipt .surti-unidad {
+    // la lista de detalle va al 75 % en el recibo; esto la devuelve al
+    // tamaño de la línea, que es lo que hace que se vea
+    font-size: 133%;
+    font-weight: normal;
+    font-style: normal;
+    text-transform: uppercase;   // CAJA, PAQUETE, DOCENA — como en ADG
+}
+
+// paquete: negrita
+.pos-receipt .surti-unidad-paquete {
+    font-weight: bold;
+}
+
+// docena: negrita y cursiva
+.pos-receipt .surti-unidad-docena {
+    font-weight: bold;
+    font-style: italic;
+}
+
+// caja, unidad, fardo y el resto: letra normal (regla general de arriba)
