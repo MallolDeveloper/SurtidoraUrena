@@ -18,8 +18,8 @@ cliente conoce (captura 20 de ADG):
   (Paquete)". La tirilla la lee el despachador y lo que tiene que ver de un
   vistazo es qué empaque va; cuántos trae ya lo dice el nombre del producto
   (11-sep-2026, con la tirilla impresa al lado de la de ADG). Cada tipo lleva
-  su estilo como código visual: PAQUETE en negrita, DOCENA en negrita
-  cursiva, el resto normal (tirilla.scss). Qué empaque rotular lo decide
+  su estilo como código visual: *CAJA en negrita con asterisco, DOCENA en
+  cursiva, PAQUETE y el resto en letra normal (tirilla.scss). Qué empaque rotular lo decide
   surtidora_pos_empaques.
 - El "Atendido por" se retira de las ventas (el cajero va al pie), pero se
   CONSERVA en el comprobante de entrada/salida de efectivo — era su única
@@ -39,7 +39,7 @@ depende del proveedor de e-CF, aún sin identificar.
 La conexión física con la impresora (ePOS/IoT Box) es configuración del
 puesto en sitio, no de este módulo.
     """,
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.2.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
