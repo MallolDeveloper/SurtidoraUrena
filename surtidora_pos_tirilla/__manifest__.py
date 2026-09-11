@@ -62,7 +62,7 @@ depende del proveedor de e-CF, aún sin identificar.
 La conexión física con la impresora (ePOS/IoT Box) es configuración del
 puesto en sitio, no de este módulo.
     """,
-    'version': '19.0.1.3.0',
+    'version': '19.0.1.3.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

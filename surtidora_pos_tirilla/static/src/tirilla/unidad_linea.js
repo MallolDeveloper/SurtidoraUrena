@@ -62,14 +62,32 @@ patch(Orderline.prototype, {
         );
         vals.surtidoraUnidad = tipo;
         vals.surtidoraUnidadClase = tipo ? `surti-unidad-${claseDe(tipo)}` : "";
-        // con signo: en una devolución el ITBIS también va en negativo.
-        // Redondeado a la moneda para que un exento no imprima «RD$ 0.00»
-        // por un residuo de coma flotante.
-        const moneda = this.line.currency;
-        const itbis = moneda.round(this.line.priceIncl - this.line.priceExcl);
-        vals.surtidoraItbis = itbis ? formatCurrency(itbis, moneda.id) : "";
+        vals.surtidoraItbis = this._surtidoraItbisLinea();
         // sin el renglón de precio: el empaque y el ITBIS van solos
         vals.displayPriceUnit = false;
         return vals;
+    },
+
+    /**
+     * El ITBIS de la línea, con signo (negativo en devoluciones) y redondeado
+     * a la moneda para que un exento no imprima «RD$ 0.00» por un residuo de
+     * coma flotante.
+     *
+     * `priceIncl`/`priceExcl` leen la línea en el mapa de cálculo de impuestos
+     * del pedido (`order_id.prices.baseLineByLineUuids[uuid]`). Una línea que
+     * no está en ese mapa —una bonificación/promoción, un premio de lealtad—
+     * haría reventar ese acceso y con él TODO el recibo. Se comprueba la misma
+     * condición que Odoo usa por dentro antes de leer: si la línea no está en
+     * el mapa, no se muestra ITBIS en ese renglón, y el recibo se imprime.
+     */
+    _surtidoraItbisLinea() {
+        const linea = this.line;
+        const base = linea.order_id?.prices?.baseLineByLineUuids?.[linea.uuid];
+        if (!base) {
+            return "";
+        }
+        const moneda = linea.currency;
+        const itbis = moneda.round(linea.priceIncl - linea.priceExcl);
+        return itbis ? formatCurrency(itbis, moneda.id) : "";
     },
 });
