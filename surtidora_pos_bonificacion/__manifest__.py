@@ -39,7 +39,7 @@ Fuera, a propósito: el tope obligatorio de RB-14. El tope nativo
 (limit_usage/max_usage) cuenta órdenes y el de ADG cuenta unidades
 regaladas; se decide con el cliente antes de exigirlo.
     """,
-    'version': '19.0.1.0.2',
+    'version': '19.0.1.0.3',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
