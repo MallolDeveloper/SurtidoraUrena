@@ -24,10 +24,23 @@ patch(PosOrderline.prototype, {
 });
 
 patch(ProductScreen.prototype, {
+    /**
+     * ⌫ sobre la línea bonificada. El núcleo, con ⌫, primero pone la
+     * cantidad en cero ("") y con el segundo ⌫ borra ("remove"). Para la
+     * bonificada las dos cosas significan lo mismo: la cajera no la quiere.
+     * Se retira de una vez y se apaga el premio, que si no el ajuste la
+     * volvería a meter (una línea en cero cuenta como cero puestas).
+     */
     _setValue(val) {
         const linea = this.currentOrder?.getSelectedOrderline();
-        if (val === "remove" && this.pos.numpadMode === "quantity" && linea?.surtidora_premio_id) {
+        const quitar = ["", "remove"].includes(val) && this.pos.numpadMode === "quantity";
+        if (quitar && linea?.surtidora_premio_id) {
             this.currentOrder.uiState.disabledRewards.add(linea.surtidora_premio_id.id);
+            this.currentOrder.removeOrderline(linea);
+            this.numberBuffer.reset();
+            // el núcleo retira su línea de premio y el ajuste, las demás bonificadas
+            this.pos.updateRewards();
+            return;
         }
         return super._setValue(...arguments);
     },
