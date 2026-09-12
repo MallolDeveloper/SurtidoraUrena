@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Junto al «Costo» (promedio), como en Costos y Precios de ADG:
+         Costo Promedio · Último Costo · Fecha Última Compra -->
+    <record id="product_template_form_ultimo_costo" model="ir.ui.view">
+        <field name="name">product.template.form.ultimo.costo.surtidora</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='categ_id']" position="before">
+                <label for="surtidora_ultimo_costo"/>
+                <div name="surtidora_ultimo_costo" class="o_row">
+                    <field name="surtidora_ultimo_costo" class="oe_inline"
+                           widget="monetary"
+                           options="{'currency_field': 'cost_currency_id', 'field_digits': True}"/>
+                    <span class="text-muted" invisible="not surtidora_ultimo_costo_fecha">
+                        el <field name="surtidora_ultimo_costo_fecha" class="oe_inline"/>
+                    </span>
+                    <span class="ms-2" invisible="not surtidora_ultimo_costo">
+                        (<field name="surtidora_ultimo_costo_desvio" class="oe_inline"
+                                decoration-danger="surtidora_ultimo_costo_desvio &gt; 5"
+                                decoration-success="surtidora_ultimo_costo_desvio &lt; -5"/>
+                        % vs promedio)
+                    </span>
+                </div>
+                <field name="surtidora_ultimo_costo_partner_id"
+                       invisible="not surtidora_ultimo_costo_partner_id"
+                       options="{'no_create': True}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
