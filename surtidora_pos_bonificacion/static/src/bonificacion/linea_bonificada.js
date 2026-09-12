@@ -1,6 +1,9 @@
 import { patch } from "@web/core/utils/patch";
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
-import { ProductScreen } from "@point_of_sale/app/screens/product_screen/product_screen";
+// En Odoo 19 el numpad (`updateSelectedOrderline` / `_setValue`) vive en
+// OrderSummary, no en ProductScreen: ahí es donde pos_loyalty engancha lo
+// suyo y ahí hay que engancharse. Parchar ProductScreen no se ejecuta nunca.
+import { OrderSummary } from "@point_of_sale/app/screens/product_screen/order_summary/order_summary";
 
 /**
  * La línea bonificada es una línea aparte y se comporta como el premio.
@@ -23,7 +26,7 @@ patch(PosOrderline.prototype, {
     },
 });
 
-patch(ProductScreen.prototype, {
+patch(OrderSummary.prototype, {
     /**
      * ⌫ sobre la línea bonificada. El núcleo, con ⌫, primero pone la
      * cantidad en cero ("") y con el segundo ⌫ borra ("remove"). Para la
