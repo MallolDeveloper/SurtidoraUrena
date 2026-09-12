@@ -23,11 +23,18 @@ cubre solo esos dos huecos, SIN reemplazar nada del estándar: agrega un botón
 - al aplicar escribe las MISMAS reglas de lista migradas (base min_qty=0 +
   empaque min_qty=factor), bloquea el precio bajo costo (RB-08) y deja rastro
   en el chatter del producto.
+- cada fila dice cuándo se actualizó por última vez (como ADG al lado de
+  cada precio);
+- y TODO cambio de precio de lista deja rastro en el chatter del producto,
+  venga del asistente, de la vista de listas de precios, de una importación
+  o de RPC — es la pestaña «Hist. Precios» de ADG (5,215 cambios en 12
+  meses, casi todos de Mariano), que Odoo no lleva porque la regla de
+  lista no tiene chatter ni tracking.
 
 Fórmula (deducida de 3,000 precios reales de ADG):
     precio = costo sin ITBIS × factor × (1 + ITBIS) × (1 + margen)
     """,
-    'version': '19.0.8.1.0',
+    'version': '19.0.9.0.0',
     'category': 'Sales/Sales',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

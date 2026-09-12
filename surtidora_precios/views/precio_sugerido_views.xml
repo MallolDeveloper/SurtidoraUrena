@@ -55,6 +55,7 @@
                         <field name="costo_total" readonly="1"/>
                         <field name="precio_actual" readonly="1"/>
                         <field name="margen_actual" optional="show" readonly="1"/>
+                        <field name="actualizado" optional="show" readonly="1"/>
                         <field name="precio_nuevo"/>
                         <field name="margen_nuevo"
                                decoration-danger="margen_nuevo &lt; 0"
