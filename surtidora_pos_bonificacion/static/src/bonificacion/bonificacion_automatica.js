@@ -95,17 +95,32 @@ patch(PosStore.prototype, {
         );
     },
 
-    /** Programas «compra N, lleva M gratis» aplicables a la orden ahora mismo. */
+    /**
+     * Programas «compra N, lleva M gratis» que hay que mirar en esta orden:
+     * los que están dando puntos ahora mismo, y además los que ya metieron
+     * unidades gratis aunque ya no den puntos. Cuando la venta baja de la
+     * cantidad, el núcleo saca al programa de `couponPointChanges` y borra su
+     * línea de premio; si no se mira también por las líneas bonificadas, la
+     * unidad regalada se queda en la orden convertida en pagada.
+     */
     _surtiBonificacionesActivas(orden) {
-        const bonos = [];
+        const bonos = new Map();
         for (const cambio of Object.values(orden.uiState.couponPointChanges)) {
             const programa = this.models["loyalty.program"].get(cambio.program_id);
             const premio = programa && this._surtiPremioDeBonificacion(programa);
             if (premio) {
-                bonos.push({ programa, premio, coupon_id: cambio.coupon_id });
+                bonos.set(programa.id, { programa, premio, coupon_id: cambio.coupon_id });
             }
         }
-        return bonos;
+        for (const linea of orden.lines) {
+            const premio = linea.surtidora_premio_id;
+            const programa = premio?.program_id;
+            if (programa && !bonos.has(programa.id)) {
+                // sin cupón vivo: no le corresponden unidades gratis
+                bonos.set(programa.id, { programa, premio, coupon_id: null });
+            }
+        }
+        return [...bonos.values()];
     },
 
     /** El único premio del programa si es una bonificación clásica; si no, null. */
@@ -158,6 +173,9 @@ patch(PosStore.prototype, {
      * (Saltinas → Dekreme) la resta da cero porque el Dekreme no puntúa.
      */
     _surtiUnidadesDebidas(orden, programa, premio, coupon_id, puestas) {
+        if (!coupon_id) {
+            return 0;
+        }
         const gastados = orden.lines
             .filter((linea) => linea.is_reward_line && linea.coupon_id?.id === coupon_id)
             .reduce((suma, linea) => suma + (linea.points_cost || 0), 0);
