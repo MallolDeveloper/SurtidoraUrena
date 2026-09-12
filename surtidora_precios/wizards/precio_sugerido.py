@@ -450,6 +450,10 @@ class PrecioSugeridoLinea(models.TransientModel):
                                  compute='_compute_desde_producto')
     margen_actual = fields.Float(string='Margen actual %',
                                  compute='_compute_desde_producto')
+    # ADG enseña la fecha de última actualización al lado de cada precio
+    # (prod_fecha1..4). En Odoo es el write_date de la regla.
+    actualizado = fields.Datetime(string='Actualizado',
+                                  compute='_compute_desde_producto')
     # OJO: campo LLANO, no computado con inverse. Con inverse, el ORM
     # escribía primero `precio_nuevo` y DESPUÉS corría el inverse, que volvía
     # a pasar el precio por el redondeo: teclear 3,883 guardaba 3,885, y un
@@ -479,6 +483,7 @@ class PrecioSugeridoLinea(models.TransientModel):
             linea.factor = fila['factor'] if fila else 0.0
             linea.costo_total = fila['costo_total_itbis'] if fila else 0.0
             linea.precio_actual = fila['precio_total'] if fila else 0.0
+            linea.actualizado = fila['actualizado'] if fila else False
             # sin precio todavía el margen no es -100%: es que no hay precio.
             # Enseñar -100.00 en un producto nuevo se lee como si algo
             # estuviera roto, y solo dice que la fila está vacía.

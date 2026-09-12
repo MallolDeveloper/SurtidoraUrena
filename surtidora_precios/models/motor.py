@@ -16,6 +16,8 @@ from markupsafe import Markup, escape
 from odoo import _, api, models
 from odoo.exceptions import AccessError, UserError
 
+from .pricelist_item import CTX_SIN_RASTRO
+
 _GRUPO = 'sales_team.group_sale_manager'
 _TOL = 0.001  # tolerancia para comparar min_quantity (float) con el factor
 
@@ -52,6 +54,9 @@ class PreciosMotor(models.AbstractModel):
                     # empaque), redondeado — 48.8889×18 da 880.0002 en float
                     'precio_total': round(regla.fixed_price * u['factor'], 2) if regla else 0.0,
                     'costo_total_itbis': costo_total,
+                    # cuándo se tocó por última vez la regla (ADG lo
+                    # muestra al lado de cada precio: prod_fecha1..4)
+                    'actualizado': regla.write_date if regla else False,
                 })
         lista_ficha = self.env.company.surtidora_lista_precio_ficha
         precio_ficha_lista = 0.0
@@ -93,7 +98,10 @@ class PreciosMotor(models.AbstractModel):
         itbis = self._tasa_itbis(tmpl)
         reglas, _extras, _frac = self._reglas_por_clave(tmpl)
         listas_ok = {l.id for l in self._listas()}
-        Item = self.env['product.pricelist.item']
+        # El rastro por regla (pricelist_item.py) calla aquí: la bitácora
+        # de abajo ya cuenta el cambio con el TOTAL del empaque y la ficha.
+        Item = self.env['product.pricelist.item'].with_context(
+            **{CTX_SIN_RASTRO: True})
         bitacora, avisos = [], []
         for c in cambios:
             lista_id = int(c['lista_id'])
@@ -104,6 +112,8 @@ class PreciosMotor(models.AbstractModel):
             if total <= 0:
                 raise UserError(_('El precio de %s debe ser mayor que cero.', unidad))
             regla = reglas.get(self._clave(lista_id, factor))
+            if regla:
+                regla = regla.with_context(**{CTX_SIN_RASTRO: True})
             anterior = round(regla.fixed_price * factor, 2) if regla else None
             costo_total = tmpl.standard_price * factor * (1 + itbis)
             if costo_total > 0 and total < costo_total:
@@ -130,7 +140,8 @@ class PreciosMotor(models.AbstractModel):
                 # sigue saliendo a 240 la media. Se mueven las dos.
                 hermanas = self._reglas_base_hermanas(tmpl, lista_id, regla)
                 if hermanas:
-                    hermanas.fixed_price = unitario
+                    hermanas.with_context(
+                        **{CTX_SIN_RASTRO: True}).fixed_price = unitario
             else:
                 Item.create({
                     'pricelist_id': lista_id,
