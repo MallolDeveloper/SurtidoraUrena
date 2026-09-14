@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cuadre_general_form" model="ir.ui.view">
+        <field name="name">surtidora.cuadre.general.form</field>
+        <field name="model">surtidora.cuadre.general</field>
+        <field name="arch" type="xml">
+            <form string="Cuadre general">
+                <group>
+                    <group>
+                        <field name="fecha"/>
+                        <field name="config_id" options="{'no_create': True}"/>
+                    </group>
+                </group>
+                <field name="resumen" nolabel="1" readonly="1"/>
+                <field name="puede_registrar" invisible="1"/>
+                <field name="a_depositar" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+                <footer>
+                    <button name="action_imprimir" type="object" string="Imprimir cuadre y depósito"
+                            class="btn-primary"/>
+                    <button name="action_registrar_deposito" type="object"
+                            string="Registrar depósito" class="btn-secondary"
+                            invisible="not puede_registrar"
+                            confirm="Se registra el depósito por el efectivo a depositar de este día (el monto sale del arqueo). ¿Continuar?"/>
+                    <button string="Cerrar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cuadre_general" model="ir.actions.act_window">
+        <field name="name">Cuadre general</field>
+        <field name="res_model">surtidora.cuadre.general</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Punto de venta → Informes → Cuadre general -->
+    <menuitem id="menu_cuadre_general" name="Cuadre general"
+              parent="point_of_sale.menu_point_rep" action="action_cuadre_general"
+              sequence="5" groups="point_of_sale.group_pos_manager"/>
+</odoo>

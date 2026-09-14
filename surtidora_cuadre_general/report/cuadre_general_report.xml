@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_reporte_cuadre_general" model="ir.actions.report">
+        <field name="name">Cuadre general y hoja de depósito</field>
+        <field name="model">surtidora.cuadre.general</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">surtidora_cuadre_general.reporte_cuadre_general</field>
+        <field name="report_file">surtidora_cuadre_general.reporte_cuadre_general</field>
+        <field name="print_report_name">'Cuadre general - %s' % (object.fecha)</field>
+    </record>
+
+    <template id="reporte_cuadre_general">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-set="d" t-value="o.surtidora_datos()"/>
+                <t t-set="moneda" t-value="o.currency_id"/>
+                <t t-set="dinero" t-value="{'widget': 'monetary', 'display_currency': moneda}"/>
+
+                <!-- ============ HOJA 1: CUADRE GENERAL ============ -->
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2 class="text-center mb-0">CUADRE GENERAL</h2>
+                        <p class="text-center text-muted">
+                            DEL: <span t-esc="d['fecha']" t-options='{"widget": "date"}'/>
+                            &#160;·&#160; CAJA: <span t-esc="d['caja_filtro']"/>
+                            &#160;·&#160; <span t-esc="d['sesiones']"/> cierres
+                        </p>
+                        <p t-if="not d['sesiones']" class="text-center fw-bold text-danger">
+                            No hay cajas cerradas ese día.
+                        </p>
+
+                        <t t-if="d['sesiones']">
+                            <table class="table table-sm">
+                                <thead><tr>
+                                    <th>Caja</th><th class="text-end">Turnos</th>
+                                    <th class="text-end">Contado</th><th class="text-end">Devoluciones</th>
+                                    <th class="text-end">Ingresos</th><th class="text-end">Egresos</th>
+                                    <th class="text-end">Balance/Caja</th><th class="text-end">Diferencia</th>
+                                </tr></thead>
+                                <tbody>
+                                    <tr t-foreach="d['cajas']" t-as="c">
+                                        <td><span t-esc="c['caja']"/>
+                                            <br/><small class="text-muted" t-esc="c['cajeros']"/></td>
+                                        <td class="text-end" t-esc="c['turnos']"/>
+                                        <td class="text-end" t-out="c['contado']" t-options="dinero"/>
+                                        <td class="text-end" t-out="c['devoluciones']" t-options="dinero"/>
+                                        <td class="text-end" t-out="c['entradas']" t-options="dinero"/>
+                                        <td class="text-end" t-out="c['egresos']" t-options="dinero"/>
+                                        <td class="text-end fw-bold" t-out="c['balance']" t-options="dinero"/>
+                                        <td t-att-class="'text-end ' + ('text-danger' if c['diferencia'] &lt; 0 else '')"
+                                            t-out="c['diferencia']" t-options="dinero"/>
+                                    </tr>
+                                </tbody>
+                                <tfoot><tr class="fw-bold">
+                                    <td>TOTALES: <span t-esc="len(d['cajas'])"/></td><td/>
+                                    <td class="text-end" t-out="d['tot_contado']" t-options="dinero"/>
+                                    <td class="text-end" t-out="d['tot_devoluciones']" t-options="dinero"/>
+                                    <td class="text-end" t-out="d['tot_entradas']" t-options="dinero"/>
+                                    <td class="text-end" t-out="d['tot_egresos']" t-options="dinero"/>
+                                    <td class="text-end" t-out="d['tot_balance']" t-options="dinero"/>
+                                    <td class="text-end" t-out="d['tot_diferencia']" t-options="dinero"/>
+                                </tr></tfoot>
+                            </table>
+
+                            <h5 class="mt-3">Detalle de ingresos por forma de pago</h5>
+                            <table class="table table-sm" style="width: 60%;">
+                                <thead><tr><th>Forma de pago</th><th class="text-end">Total</th></tr></thead>
+                                <tbody>
+                                    <tr t-foreach="d['metodos']" t-as="m">
+                                        <td><span t-esc="m['nombre']"/>
+                                            <small t-if="m['de_caja']" class="text-muted"> (gaveta)</small>
+                                            <small t-if="m['diferido']" class="text-muted"> (no es dinero de hoy)</small></td>
+                                        <td class="text-end" t-out="m['monto']" t-options="dinero"/>
+                                    </tr>
+                                    <tr t-if="d['tot_egresos']">
+                                        <td>Egresos de caja</td>
+                                        <td class="text-end" t-out="-d['tot_egresos']" t-options="dinero"/>
+                                    </tr>
+                                </tbody>
+                                <tfoot><tr class="fw-bold"><td>Ventas según facturas</td>
+                                    <td class="text-end" t-out="d['segun_facturas']" t-options="dinero"/></tr></tfoot>
+                            </table>
+
+                            <h5 class="mt-3">Cajeros del día</h5>
+                            <table class="table table-sm" style="width: 60%;">
+                                <thead><tr><th>Cajero</th><th class="text-end">Órdenes</th><th class="text-end">Monto</th></tr></thead>
+                                <tbody>
+                                    <tr t-foreach="d['cajeros']" t-as="c">
+                                        <td t-esc="c['nombre']"/>
+                                        <td class="text-end" t-esc="c['ordenes']"/>
+                                        <td class="text-end" t-out="c['monto']" t-options="dinero"/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <table class="table table-borderless mt-5" style="width: 100%;">
+                            <tr>
+                                <td style="width: 45%; border-top: 1px solid #000;" class="text-center">FIRMA RECIBIDO CONFORME</td>
+                                <td style="width: 10%;"/>
+                                <td style="width: 45%; border-top: 1px solid #000;" class="text-center">FIRMA CAJERO (QUIEN ENTREGA)</td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+
+                <!-- ============ HOJA 2: DEPÓSITO ============ -->
+                <t t-if="d['sesiones']" t-call="web.external_layout">
+                    <div class="page">
+                        <h2 class="text-center mb-0">HOJA DE DEPÓSITO</h2>
+                        <p class="text-center text-muted">
+                            <span t-if="d['banco']" t-esc="d['banco']"/>
+                            &#160;·&#160; FECHA: <span t-esc="d['fecha']" t-options='{"widget": "date"}'/>
+                        </p>
+                        <p t-if="d['arqueo_incompleto']" class="text-center fw-bold text-danger">
+                            Alguna caja cerró sin conteo por denominación: el desglose está incompleto.
+                        </p>
+
+                        <div class="row">
+                            <div class="col-6">
+                                <h5>Conteo por denominación</h5>
+                                <table class="table table-sm">
+                                    <thead><tr><th>Denominación</th><th class="text-end">Cantidad</th><th class="text-end">Monto</th></tr></thead>
+                                    <tbody>
+                                        <tr t-foreach="d['arqueo']" t-as="a">
+                                            <td t-out="a['denominacion']" t-options="dinero"/>
+                                            <td class="text-end" t-esc="a['cantidad']"/>
+                                            <td class="text-end" t-out="a['subtotal']" t-options="dinero"/>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot><tr class="fw-bold"><td colspan="2">TOTAL CONTADO</td>
+                                        <td class="text-end" t-out="d['total_arqueo']" t-options="dinero"/></tr></tfoot>
+                                </table>
+                            </div>
+                            <div class="col-6">
+                                <h5>Resumen</h5>
+                                <table class="table table-sm">
+                                    <tr><td>Efectivo contado en las cajas</td>
+                                        <td class="text-end" t-out="d['efectivo_contado']" t-options="dinero"/></tr>
+                                    <tr><td>Fondos dejados (<span t-esc="d['sesiones']"/> ×
+                                        <span t-out="d['fondo_por_caja']" t-options="dinero"/>)</td>
+                                        <td class="text-end" t-out="-d['fondos_dejados']" t-options="dinero"/></tr>
+                                    <tr class="fw-bold"><td>EFECTIVO A DEPOSITAR</td>
+                                        <td class="text-end" t-out="d['a_depositar']" t-options="dinero"/></tr>
+                                    <tr t-foreach="[m for m in d['metodos'] if not m['de_caja'] and not m['diferido']]" t-as="m">
+                                        <td t-esc="m['nombre']"/>
+                                        <td class="text-end" t-out="m['monto']" t-options="dinero"/>
+                                    </tr>
+                                    <tr><td>Egresos de caja</td>
+                                        <td class="text-end" t-out="d['tot_egresos']" t-options="dinero"/></tr>
+                                    <tr class="fw-bold" style="border-top: 2px solid #000;"><td>TOTAL</td>
+                                        <td class="text-end" t-out="d['contado_total']" t-options="dinero"/></tr>
+                                    <tr><td>Ventas según facturas</td>
+                                        <td class="text-end" t-out="d['segun_facturas']" t-options="dinero"/></tr>
+                                    <tr t-att-class="'fw-bold ' + ('text-danger' if d['sobrante'] &lt; 0 else 'text-success')">
+                                        <td><t t-if="d['sobrante'] &gt;= 0">SOBRANTE</t><t t-else="">FALTANTE</t></td>
+                                        <td class="text-end" t-out="d['sobrante']" t-options="dinero"/></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <table class="table table-borderless mt-5" style="width: 100%;">
+                            <tr>
+                                <td style="width: 45%; border-top: 1px solid #000;" class="text-center">PREPARADO POR</td>
+                                <td style="width: 10%;"/>
+                                <td style="width: 45%; border-top: 1px solid #000;" class="text-center">DEPOSITADO POR</td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
