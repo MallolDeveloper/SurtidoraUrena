@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cuadre_general_manager,surtidora.cuadre.general manager,model_surtidora_cuadre_general,point_of_sale.group_pos_manager,1,1,1,1
+access_cuadre_general_account,surtidora.cuadre.general account,model_surtidora_cuadre_general,account.group_account_readonly,1,1,1,1

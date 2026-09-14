@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_cuadre_general" model="ir.ui.view">
+        <field name="name">res.config.settings.cuadre.general.surtidora</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='pos_payment_section']" position="after">
+                <block title="Cuadre general y depósito (Surtidora)" name="surtidora_cuadre_general_section">
+                    <setting id="surtidora_fondo_caja_setting" string="Fondo por caja"
+                             help="Lo que la supervisora deja en cada gaveta al cerrar. La hoja de depósito lo resta del efectivo contado.">
+                        <field name="surtidora_fondo_caja"/>
+                    </setting>
+                    <setting id="surtidora_registrar_deposito_setting" string="Registrar el depósito desde el cuadre"
+                             help="Apagado: la hoja solo se imprime y contabilidad marca el depósito al conciliar. Encendido: la supervisora confirma y queda el asiento caja → banco.">
+                        <field name="surtidora_registrar_deposito"/>
+                        <div class="content-group mt16" invisible="not surtidora_registrar_deposito">
+                            <label for="surtidora_diario_deposito_id" class="o_light_label"/>
+                            <field name="surtidora_diario_deposito_id" options="{'no_create': True}"/>
+                        </div>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>
