@@ -5,7 +5,7 @@
         <field name="model">res.config.settings</field>
         <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//block[@name='pos_payment_section']" position="after">
+            <xpath expr="//block[@id='pos_payment_section']" position="after">
                 <block title="Cuadre general y depósito (Surtidora)" name="surtidora_cuadre_general_section">
                     <setting id="surtidora_fondo_caja_setting" string="Fondo por caja"
                              help="Lo que la supervisora deja en cada gaveta al cerrar. La hoja de depósito lo resta del efectivo contado.">
