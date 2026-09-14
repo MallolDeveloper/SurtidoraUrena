@@ -137,8 +137,7 @@
                                 <table class="table table-sm">
                                     <tr><td>Efectivo contado en las cajas</td>
                                         <td class="text-end" t-out="d['efectivo_contado']" t-options="dinero"/></tr>
-                                    <tr><td>Fondos dejados (<span t-esc="d['sesiones']"/> ×
-                                        <span t-out="d['fondo_por_caja']" t-options="dinero"/>)</td>
+                                    <tr><td>Fondos dejados en las cajas (<span t-esc="d['sesiones']"/> cierres)</td>
                                         <td class="text-end" t-out="-d['fondos_dejados']" t-options="dinero"/></tr>
                                     <tr class="fw-bold"><td>EFECTIVO A DEPOSITAR</td>
                                         <td class="text-end" t-out="d['a_depositar']" t-options="dinero"/></tr>

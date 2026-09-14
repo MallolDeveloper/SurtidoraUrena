@@ -33,7 +33,7 @@ Los métodos de pago separados (Transferencia, Tarjeta del Gobierno,
 Cardnet) y el bono de tarjeta preferencial como medio de pago son
 CONFIGURACIÓN de pos.payment.method, no código: aquí solo salen en su fila.
     """,
-    'version': '19.0.1.0.1',
+    'version': '19.0.1.0.2',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

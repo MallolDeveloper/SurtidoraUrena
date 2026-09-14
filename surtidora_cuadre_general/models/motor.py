@@ -13,7 +13,7 @@ import datetime
 
 import pytz
 
-from odoo import _, api, models
+from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
 
 
@@ -61,6 +61,7 @@ class CuadreGeneralMotor(models.AbstractModel):
     @api.model
     def datos(self, fecha, config=None):
         """Todo lo que pintan las dos hojas, en un dict."""
+        fecha = fields.Date.to_date(fecha)  # por RPC llega como texto
         sesiones = self.sesiones_del_dia(fecha, config)
         detalles = [(s, s.surtidora_datos_cuadre()) for s in sesiones]
         empresa = self.env.company
@@ -77,7 +78,13 @@ class CuadreGeneralMotor(models.AbstractModel):
         total_egresos = sum(c['egresos'] for c in cajas)
         total_diferencia = sum(c['diferencia'] for c in cajas)
         efectivo_contado = sum(d['contado'] for _s, d in detalles)
-        fondos_dejados = fondo * len(sesiones)
+        # Lo que se deja en la gaveta es el fondo con que ABRIÓ cada sesión
+        # (Odoo lo guarda: cash_register_balance_start), no un fijo por
+        # configuración: si un día una caja abrió con más, ese «más» no es
+        # sobrante del día. El fondo configurado solo se usa si la sesión
+        # abrió en cero (caja nueva sin apertura registrada).
+        fondos_dejados = sum(
+            d['fondo'] if d['fondo'] else fondo for _s, d in detalles)
         a_depositar = efectivo_contado - fondos_dejados
 
         # «Según facturas»: lo que las ventas dicen que debió entrar por
@@ -199,6 +206,7 @@ class CuadreGeneralMotor(models.AbstractModel):
         de la caja. Así el extracto del banco lo casa solo al conciliar.
         Idempotente por día y caja: no se registra dos veces."""
         self._verificar_acceso()
+        fecha = fields.Date.to_date(fecha)
         empresa = self.env.company
         if not empresa.surtidora_registrar_deposito:
             raise UserError(_('El registro del depósito está apagado en Ajustes.'))
