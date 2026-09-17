@@ -1,0 +1,21 @@
+name: Deploy Produccion (OVH)
+
+on:
+  push:
+    branches: [produccion]
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy a OVH produccion (erp.surtidoraurena.com) via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 148.113.240.122
+          username: ubuntu
+          key: ${{ secrets.OVH_SSH_KEY }}
+          script: bash /opt/surtidora/deploy.sh prod
