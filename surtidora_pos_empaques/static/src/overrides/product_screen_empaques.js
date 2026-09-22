@@ -15,7 +15,23 @@ import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
  *    precio suelto). Solo fracciones que den unidades base enteras. La línea
  *    lleva precio manual (price_type) para que no se recalcule a precio suelto.
  * 3. Escanear el barcode del empaque agrega el factor completo (REQ-P02).
+ * 4. Un código que vive en product.uom (empaque o código extra de la unidad
+ *    base) de un producto NO precargado se encuentra en el servidor: la caja
+ *    precarga como mucho `limited_product_count` productos y el POS estándar
+ *    solo busca afuera por product.product.barcode («código desconocido»).
  */
+/**
+ * Búsqueda en el servidor de CADA escaneo, por el objeto del código.
+ *
+ * Un mismo escaneo pasa por varias capas que preguntan «¿qué producto es?»
+ * (este módulo, surtidora_pos_cliente_cedula, pos_barcodelookup y el POS
+ * estándar). Sin esto, un código que no es producto (una cédula) iba al
+ * servidor una vez por capa. El lector arma un objeto nuevo por escaneo, así
+ * que la clave caduca sola con el escaneo y el siguiente vuelve a preguntar
+ * (por si el producto se creó entre medio).
+ */
+const busquedasEnServidor = new WeakMap();
+
 const FRACCIONES = [
     { f: 0.25, txt: "¼" },
     { f: 0.5, txt: "½" },
@@ -130,8 +146,83 @@ patch(ProductScreen.prototype, {
         return super.addProductToOrder(...arguments);
     },
 
+    /** Producto de un código entre lo precargado: el suyo o el de su empaque. */
+    _surtiProductoLocalPorCodigo(barcode) {
+        const producto = this.pos.models["product.product"].getBy("barcode", barcode);
+        if (producto) {
+            return producto;
+        }
+        const empaque = this.pos.models["product.uom"].getBy("barcode", barcode);
+        return empaque && empaque.product_id;
+    },
+
+    /**
+     * El dominio del POS estándar más los códigos de product.uom (empaques y
+     * códigos extra de la unidad base, hasta 38 por producto en Surtidora).
+     * El servidor (load_product_from_pos) ya devuelve las product.uom cuyo
+     * barcode está en el dominio: con esto el empaque llega a la caja junto
+     * con el producto, sus precios y sus demás empaques.
+     */
+    _surtiDominioPorCodigo(barcode) {
+        return [
+            "|",
+            ["product_variant_ids.barcode", "in", [barcode]],
+            ["product_variant_ids.product_uom_ids.barcode", "in", [barcode]],
+        ];
+    },
+
+    /** Trae del servidor el producto del código y lo resuelve ya cargado. */
+    async _surtiCargarProductoPorCodigo(barcode) {
+        await this.pos.loadNewProducts(this._surtiDominioPorCodigo(barcode));
+        // Se resuelve por el código y no con el primer producto devuelto:
+        // una plantilla con variantes trae todas y el código es de una sola.
+        return this._surtiProductoLocalPorCodigo(barcode);
+    },
+
+    /**
+     * Lo precargado sigue por el camino estándar (sin viaje al servidor). Lo
+     * que no, se busca UNA vez por escaneo con el dominio ampliado; como ese
+     * dominio contiene al estándar, si aquí no aparece tampoco aparecería
+     * allá, y por eso no se vuelve a preguntar con super.
+     */
+    async _getProductByBarcode(code) {
+        if (!code?.base_code || this._surtiProductoLocalPorCodigo(code.base_code)) {
+            return super._getProductByBarcode(...arguments);
+        }
+        // La cédula/tarjeta de un cliente que la caja ya tiene cargado no es
+        // un producto: sin esto cada escaneo del cliente frecuente iría al
+        // servidor a buscar un producto y, sin red, dejaría de asignarse
+        // (antes se asignaba sin ningún viaje). surtidora_pos_cliente_cedula
+        // lo asigna después, desde lo local.
+        if (this.pos.models["res.partner"].getBy("barcode", code.code || code.base_code)) {
+            return undefined;
+        }
+        if (!busquedasEnServidor.has(code)) {
+            busquedasEnServidor.set(code, this._surtiCargarProductoPorCodigo(code.base_code));
+        }
+        return busquedasEnServidor.get(code);
+    },
+
+    /**
+     * Primero se asegura el producto (lo trae del servidor si no estaba
+     * precargado) y solo entonces se mira si el código es de un empaque: el
+     * empaque de un producto no precargado tampoco estaba en la caja. Un
+     * código extra de la unidad base (factor 1) sigue al estándar: 1 unidad.
+     */
     async _barcodeProductAction(code) {
+        await this._getProductByBarcode(code);
         const empaque = this.pos.models["product.uom"].getBy("barcode", code.base_code);
+        if (empaque && empaque.product_id && !empaque.uom_id) {
+            // La unidad del empaque se creó con la caja abierta: la caja carga
+            // las unidades solo al abrir y no la conoce. Cobrar 1 unidad en
+            // silencio sería peor que avisar.
+            this.notification.add(
+                "Este empaque es nuevo y la caja todavía no lo conoce: recargue la caja (F5) y vuelva a escanear.",
+                { type: "danger" }
+            );
+            this.numberBuffer.reset();
+            return;
+        }
         const factor = empaque && empaque.uom_id && empaque.uom_id.relative_factor;
         if (empaque && empaque.product_id && factor > 1) {
             await this.pos.addLineToCurrentOrder(

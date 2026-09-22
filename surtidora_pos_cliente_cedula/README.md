@@ -8,9 +8,11 @@ puerta de entrada de los surti-puntos.
 
 1. **Captura**: en la ficha del cliente aparece el campo "Código cédula/tarjeta
    (POS)" (junto a las etiquetas). Se escanea o digita una vez, ahí queda.
-2. **En el POS**: cualquier código escaneado que no sea producto se busca como
-   cliente (primero en datos cargados, luego en el servidor) y se asigna a la
-   orden. Con el cliente asignado, la lealtad acumula automáticamente.
+2. **En el POS**: el código se busca primero como producto (precargado y, si no
+   está, en el servidor — con `surtidora_pos_empaques`, también por el código
+   de sus empaques). Si no es producto se busca como cliente (primero en datos
+   cargados, luego en el servidor) y se asigna a la orden. Con el cliente
+   asignado, la lealtad acumula automáticamente.
 3. Si tampoco es cliente → aviso estándar de código desconocido.
 
 ## Decisión de diseño

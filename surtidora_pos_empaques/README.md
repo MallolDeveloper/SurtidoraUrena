@@ -9,6 +9,7 @@ operación real el **45% de las líneas** se vende en empaques (docena/caja/fard
 |---|---|---|
 | Tocar un producto con empaques | Agrega 1 unidad base | Popup: "Paquete — 55.00" / "Caja de 18 — 880.00" con el precio real de cada unidad |
 | Escanear barcode del empaque | Agregaba 1 unidad base (precio errado) o "desconocido" | Agrega el factor completo (18) → total 880 |
+| Escanear un código de empaque (o código extra) de un producto NO precargado | "Código desconocido": el POS solo buscaba en el servidor por el código del producto | Se busca también en `product.uom`: llega el producto con precios y empaques, y la línea sale en su unidad (empaque → factor; extra de la base → 1) |
 | Precio | — | Lo resuelve la regla por cantidad de la lista de precios (sin lógica duplicada) |
 
 La línea queda en unidad base (18 Paquete × 48.89 = 880.00) — así modela el POS
@@ -33,7 +34,8 @@ caja**: ½ caja de 18 = 9 und a 440.00 (tarifa caja 48.89), no a precio suelto.
   `uom_ids` (product.template) a la data que el POS carga. Con `*args` para
   tolerar cambios de firma entre builds.
 - `static/src/overrides/product_screen_empaques.js`: patch de `ProductScreen`
-  (popup de unidad + corrección del escaneo de empaque).
+  (popup de unidad + corrección del escaneo de empaque + búsqueda en el
+  servidor por el código de `product.uom`, una sola vez por escaneo).
 
 ## Prueba post-merge
 
