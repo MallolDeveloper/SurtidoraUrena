@@ -23,7 +23,7 @@
                         <p class="text-center text-muted">
                             DEL: <span t-esc="d['fecha']" t-options='{"widget": "date"}'/>
                             &#160;·&#160; CAJA: <span t-esc="d['caja_filtro']"/>
-                            &#160;·&#160; <span t-esc="d['sesiones']"/> cierres
+                            &#160;·&#160; <span t-esc="d['texto_cierres']"/>
                         </p>
                         <p t-if="not d['sesiones']" class="text-center fw-bold text-danger">
                             No hay cajas cerradas ese día.
@@ -137,7 +137,7 @@
                                 <table class="table table-sm">
                                     <tr><td>Efectivo contado en las cajas</td>
                                         <td class="text-end" t-out="d['efectivo_contado']" t-options="dinero"/></tr>
-                                    <tr><td>Fondos dejados en las cajas (<span t-esc="d['sesiones']"/> cierres)</td>
+                                    <tr><td>Fondos dejados en las cajas (<span t-esc="d['texto_cierres']"/>)</td>
                                         <td class="text-end" t-out="-d['fondos_dejados']" t-options="dinero"/></tr>
                                     <tr class="fw-bold"><td>EFECTIVO A DEPOSITAR</td>
                                         <td class="text-end" t-out="d['a_depositar']" t-options="dinero"/></tr>

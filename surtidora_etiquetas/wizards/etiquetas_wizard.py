@@ -24,8 +24,12 @@ class EtiquetasWizard(models.TransientModel):
         return self.env.ref('surtidora_etiquetas.action_report_etiquetas').report_action(self)
 
     def _etiquetas(self):
-        """Datos de cada etiqueta: [{producto, unidad, barcode, precio}, ...]"""
+        """Datos de cada etiqueta: [{producto, unidad, barcode, precio, moneda}, ...]
+
+        La moneda es la de la lista elegida: la etiqueta dice el precio de ESA
+        lista, y la plantilla lo formatea con el símbolo y los miles de Odoo."""
         self.ensure_one()
+        moneda = self.pricelist_id.currency_id
         etiquetas = []
         for producto in self.product_ids:
             etiquetas.append({
@@ -35,6 +39,7 @@ class EtiquetasWizard(models.TransientModel):
                 'barcode': producto.barcode or '',
                 'precio': self.pricelist_id._get_product_price(
                     producto.product_variant_id, 1.0, uom=producto.uom_id),
+                'moneda': moneda,
             })
             if not self.incluir_empaques:
                 continue
@@ -51,6 +56,7 @@ class EtiquetasWizard(models.TransientModel):
                     'precio': self.pricelist_id._get_product_price(
                         producto.product_variant_id, factor,
                         uom=producto.uom_id) * factor,
+                    'moneda': moneda,
                 })
         return etiquetas
 

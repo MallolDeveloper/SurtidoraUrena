@@ -28,12 +28,17 @@ y egresos, contra las ventas según facturas — y el sobrante o faltante).
   depositar, con el monto que sale del arqueo — la supervisora confirma,
   no teclea. Apagado, la hoja solo se imprime y contabilidad marca el
   depósito al conciliar el extracto (decisión del cliente, 14-sep-2026).
+  El botón solo aparece a quien puede contabilizar («Contabilidad /
+  Facturación»): ver el cuadre no basta para mover dinero.
+- Al abrir un turno, la caja propone el fondo configurado (RD$2,000) en
+  vez de lo contado en el cierre anterior, que incluía lo que se llevó al
+  banco: así la cajera no ve una «diferencia» cada mañana.
 
 Los métodos de pago separados (Transferencia, Tarjeta del Gobierno,
 Cardnet) y el bono de tarjeta preferencial como medio de pago son
 CONFIGURACIÓN de pos.payment.method, no código: aquí solo salen en su fila.
     """,
-    'version': '19.0.1.0.2',
+    'version': '19.0.1.1.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

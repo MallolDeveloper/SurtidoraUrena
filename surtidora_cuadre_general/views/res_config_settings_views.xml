@@ -8,11 +8,11 @@
             <xpath expr="//block[@id='pos_payment_section']" position="after">
                 <block title="Cuadre general y depósito (Surtidora)" name="surtidora_cuadre_general_section">
                     <setting id="surtidora_fondo_caja_setting" string="Fondo por caja"
-                             help="Lo que la supervisora deja en cada gaveta al cerrar. La hoja de depósito lo resta del efectivo contado.">
+                             help="Lo que la supervisora deja en cada gaveta al cerrar. La hoja de depósito lo resta del efectivo contado, y la caja lo propone al abrir el turno siguiente.">
                         <field name="surtidora_fondo_caja"/>
                     </setting>
                     <setting id="surtidora_registrar_deposito_setting" string="Registrar el depósito desde el cuadre"
-                             help="Apagado: la hoja solo se imprime y contabilidad marca el depósito al conciliar. Encendido: la supervisora confirma y queda el asiento caja → banco.">
+                             help="Apagado: la hoja solo se imprime y contabilidad marca el depósito al conciliar. Encendido: la supervisora confirma y queda el asiento caja → banco. El botón solo aparece a quien tiene el permiso Contabilidad / Facturación.">
                         <field name="surtidora_registrar_deposito"/>
                         <div class="content-group mt16" invisible="not surtidora_registrar_deposito">
                             <label for="surtidora_diario_deposito_id" class="o_light_label"/>

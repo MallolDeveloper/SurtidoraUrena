@@ -22,4 +22,6 @@ class ResCompany(models.Model):
         currency_field='currency_id',
         help='Lo que la supervisora deja en la gaveta al cerrar (RD$2,000 en '
              'todas las cajas, medido en ADG). La hoja de depósito lo resta '
-             'del efectivo contado por cada caja cerrada.')
+             'del efectivo contado por cada caja cerrada, y la caja lo propone '
+             'al abrir el turno siguiente. En cero, la caja propone lo contado '
+             'en el cierre anterior, como Odoo de fábrica.')
