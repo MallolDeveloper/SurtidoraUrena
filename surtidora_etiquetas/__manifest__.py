@@ -34,7 +34,7 @@ imprimiría 0028661704211 — trece dígitos que no están en ninguna ficha y qu
 al escanear no encuentran nada. Comprobado comparando las imágenes byte a
 byte contra las de Code128.
     """,
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.1.1',
     'category': 'Inventory',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

@@ -32,7 +32,7 @@
                         <t t-esc="e['referencia']"/> · <t t-esc="e['unidad']"/>
                     </div>
                     <div style="font-size: 14px; font-weight: bold;">
-                        RD$ <t t-esc="'%.2f' % e['precio']"/>
+                        <t t-out="e['precio']" t-options="{'widget': 'monetary', 'display_currency': e['moneda']}"/>
                     </div>
                     <t t-if="e['barcode']">
                         <!-- `auto`, no una simbología fija. Odoo mira el largo:

@@ -50,10 +50,34 @@ class CuadreGeneralMotor(models.AbstractModel):
 
     @api.model
     def _verificar_acceso(self):
+        """Permiso para MIRAR el cuadre: encargado de caja o contabilidad."""
         if not (self.env.user.has_group('point_of_sale.group_pos_manager')
                 or self.env.user.has_group('account.group_account_readonly')):
             raise AccessError(_('Solo el encargado del punto de venta o '
                                 'contabilidad pueden ver el cuadre general.'))
+
+    @api.model
+    def _puede_contabilizar(self):
+        """Registrar el depósito CREA y CONTABILIZA un asiento. De los perfiles
+        que pueden ver el cuadre, ni «Encargado del punto de venta» ni
+        «Contabilidad / Solo lectura» pueden crear asientos en Odoo: solo
+        «Contabilidad / Facturación» (y los que lo incluyen)."""
+        return self.env.user.has_group('account.group_account_invoice')
+
+    @api.model
+    def _verificar_permiso_registrar(self):
+        if not self._puede_contabilizar():
+            raise AccessError(_(
+                'Registrar el depósito crea un asiento en la contabilidad: hace '
+                'falta el permiso «Contabilidad / Facturación». Con solo poder '
+                'ver el cuadre no alcanza.'))
+
+    @api.model
+    def texto_cierres(self, cantidad):
+        """«1 cierre» / «3 cierres», para las dos hojas impresas."""
+        if cantidad == 1:
+            return _('1 cierre')
+        return _('%s cierres', cantidad)
 
     # ------------------------------------------------------------------
     # Consolidación
@@ -101,6 +125,7 @@ class CuadreGeneralMotor(models.AbstractModel):
             'fecha': fecha,
             'caja_filtro': config.name if config else _('(TODAS)'),
             'sesiones': len(sesiones),
+            'texto_cierres': self.texto_cierres(len(sesiones)),
             'cajas': cajas,
             'tot_contado': total_contado,
             'tot_devoluciones': total_devol,
@@ -122,7 +147,8 @@ class CuadreGeneralMotor(models.AbstractModel):
             'arqueo_incompleto': any(
                 not d['arqueo'] for _s, d in detalles) and bool(detalles),
             'puede_registrar': empresa.surtidora_registrar_deposito
-            and bool(empresa.surtidora_diario_deposito_id),
+            and bool(empresa.surtidora_diario_deposito_id)
+            and self._puede_contabilizar(),
             'banco': empresa.surtidora_diario_deposito_id.name or '',
         }
 
@@ -206,6 +232,7 @@ class CuadreGeneralMotor(models.AbstractModel):
         de la caja. Así el extracto del banco lo casa solo al conciliar.
         Idempotente por día y caja: no se registra dos veces."""
         self._verificar_acceso()
+        self._verificar_permiso_registrar()
         fecha = fields.Date.to_date(fecha)
         empresa = self.env.company
         if not empresa.surtidora_registrar_deposito:
