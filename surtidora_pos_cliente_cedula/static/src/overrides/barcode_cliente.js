@@ -5,11 +5,16 @@ import { ProductScreen } from "@point_of_sale/app/screens/product_screen/product
 /**
  * Identificación del cliente por cédula/tarjeta en el POS (REQ-V29).
  *
- * Si el código escaneado no corresponde a ningún producto (ni base ni
- * empaque), se busca como cliente por su código de barras — primero en los
- * datos cargados y luego en el servidor (reutilizando _getPartnerByBarcode
- * del POS estándar) — y se asigna a la orden. Si tampoco es cliente, sigue
- * el flujo estándar (que muestra el aviso de código desconocido).
+ * Orden de búsqueda de un código escaneado:
+ *   1. producto o empaque precargado en la caja;
+ *   2. producto en el servidor (con surtidora_pos_empaques instalado, también
+ *      por el código de sus empaques/códigos extra: product.uom);
+ *   3. cliente por su código de barras — primero en los datos cargados y
+ *      luego en el servidor (_getPartnerByBarcode del POS estándar) — y se
+ *      asigna a la orden;
+ *   4. flujo estándar (aviso de código desconocido).
+ * Antes el cliente se buscaba ANTES que el producto no precargado: un viaje
+ * de más al servidor por cada producto que no estaba en la caja.
  */
 patch(ProductScreen.prototype, {
     setup() {
@@ -35,22 +40,29 @@ patch(ProductScreen.prototype, {
     },
 
     async _barcodeProductAction(code) {
-        const esProductoLocal =
-            this.pos.models["product.product"].getBy("barcode", code.base_code) ||
-            this.pos.models["product.uom"].getBy("barcode", code.base_code);
-        if (!esProductoLocal) {
-            const cliente = await this._getPartnerByBarcode({ code: code.base_code });
-            if (cliente) {
-                // Vía oficial del store (v19 renombró set_partner→setPartner;
-                // además así se disparan los efectos colgados del cambio de
-                // cliente, como la carga del balance CxC del panel).
-                if (this.currentOrder.getPartner() !== cliente) {
-                    this.pos.setPartnerToCurrentOrder(cliente);
-                }
-                this.numberBuffer.reset();
-                return;
-            }
+        // _getProductByBarcode ya mira lo local y, si hace falta, el servidor;
+        // la capa que lo llame después en este mismo escaneo no repite viaje
+        // (surtidora_pos_empaques lo recuerda por escaneo).
+        const producto = await this._getProductByBarcode(code);
+        if (!producto && (await this._surtiAsignarClientePorCodigo(code))) {
+            this.numberBuffer.reset();
+            return;
         }
         return super._barcodeProductAction(...arguments);
+    },
+
+    /** Asigna a la orden el cliente dueño del código. ¿Lo encontró? */
+    async _surtiAsignarClientePorCodigo(code) {
+        const cliente = await this._getPartnerByBarcode({ code: code.base_code });
+        if (!cliente) {
+            return false;
+        }
+        // Vía oficial del store (v19 renombró set_partner→setPartner;
+        // además así se disparan los efectos colgados del cambio de
+        // cliente, como la carga del balance CxC del panel).
+        if (this.currentOrder.getPartner() !== cliente) {
+            this.pos.setPartnerToCurrentOrder(cliente);
+        }
+        return true;
     },
 });
