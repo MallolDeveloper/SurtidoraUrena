@@ -189,6 +189,14 @@ patch(ProductScreen.prototype, {
         if (!code?.base_code || this._surtiProductoLocalPorCodigo(code.base_code)) {
             return super._getProductByBarcode(...arguments);
         }
+        // La cédula/tarjeta de un cliente que la caja ya tiene cargado no es
+        // un producto: sin esto cada escaneo del cliente frecuente iría al
+        // servidor a buscar un producto y, sin red, dejaría de asignarse
+        // (antes se asignaba sin ningún viaje). surtidora_pos_cliente_cedula
+        // lo asigna después, desde lo local.
+        if (this.pos.models["res.partner"].getBy("barcode", code.code || code.base_code)) {
+            return undefined;
+        }
         if (!busquedasEnServidor.has(code)) {
             busquedasEnServidor.set(code, this._surtiCargarProductoPorCodigo(code.base_code));
         }
@@ -204,6 +212,17 @@ patch(ProductScreen.prototype, {
     async _barcodeProductAction(code) {
         await this._getProductByBarcode(code);
         const empaque = this.pos.models["product.uom"].getBy("barcode", code.base_code);
+        if (empaque && empaque.product_id && !empaque.uom_id) {
+            // La unidad del empaque se creó con la caja abierta: la caja carga
+            // las unidades solo al abrir y no la conoce. Cobrar 1 unidad en
+            // silencio sería peor que avisar.
+            this.notification.add(
+                "Este empaque es nuevo y la caja todavía no lo conoce: recargue la caja (F5) y vuelva a escanear.",
+                { type: "danger" }
+            );
+            this.numberBuffer.reset();
+            return;
+        }
         const factor = empaque && empaque.uom_id && empaque.uom_id.relative_factor;
         if (empaque && empaque.product_id && factor > 1) {
             await this.pos.addLineToCurrentOrder(
