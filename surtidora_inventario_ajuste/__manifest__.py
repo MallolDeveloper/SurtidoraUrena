@@ -25,7 +25,7 @@ de inventario físico: el botón «Aplicar» de cada línea y «Aplicar todo».
 
 Reutiliza el PIN y el grupo de supervisores de surtidora_autorizacion_precio.
     """,
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'category': 'Inventory/Inventory',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

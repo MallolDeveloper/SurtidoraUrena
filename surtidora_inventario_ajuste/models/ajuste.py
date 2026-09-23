@@ -20,6 +20,7 @@ from odoo.exceptions import AccessError, UserError
 from odoo.tools import float_is_zero
 
 CTX_VALE = 'surtidora_ajuste_vale'
+CTX_FECHA = 'surtidora_ajuste_fecha'
 
 
 class MotivoAjuste(models.Model):
@@ -133,26 +134,37 @@ class StockMove(models.Model):
 class StockQuant(models.Model):
     _inherit = 'stock.quant'
 
-    def action_apply_inventory(self):
+    def action_apply_inventory(self, date=None):
         """Abre el asistente de autorización. La compuerta de verdad está
         en `stock.move.create`; esto solo es el camino cómodo para la
         cajera/encargado (si alguien llegara por otra vía, el movimiento
-        se rechaza igual)."""
+        se rechaza igual).
+
+        `date` es la fecha del conteo que Odoo 19 manda desde «Aplicar» con
+        líneas marcadas y desde «Aplicar todo». Sin aceptarla, esos dos
+        botones reventaban (TypeError) y solo servía el de cada línea. Viaja
+        en el contexto hasta el asistente, junto con el nombre del ajuste,
+        para que el movimiento quede con la fecha y la referencia elegidas."""
         if self.env.context.get(CTX_VALE):
-            return super().action_apply_inventory()
+            return super().action_apply_inventory(date)
         pendientes = self.filtered(lambda q: not float_is_zero(
             q.inventory_quantity - q.quantity,
             precision_rounding=q.product_uom_id.rounding or 0.01))
         if not pendientes:
             # falla CERRADA: nunca aplicar por el camino de escape
             raise UserError(_('No hay diferencias por ajustar en estas líneas.'))
+        contexto = {'default_quant_ids': [(6, 0, pendientes.ids)]}
+        if date:
+            contexto[CTX_FECHA] = fields.Date.to_string(date)
+        if self.env.context.get('inventory_name'):
+            contexto['inventory_name'] = self.env.context['inventory_name']
         return {
             'type': 'ir.actions.act_window',
             'name': _('Autorizar ajuste de inventario'),
             'res_model': 'surtidora.ajuste.autorizacion',
             'view_mode': 'form',
             'target': 'new',
-            'context': {'default_quant_ids': [(6, 0, pendientes.ids)]},
+            'context': contexto,
         }
 
     def surtidora_datos_ajuste(self):
