@@ -36,6 +36,11 @@ caja**: ½ caja de 18 = 9 und a 440.00 (tarifa caja 48.89), no a precio suelto.
 - `static/src/overrides/product_screen_empaques.js`: patch de `ProductScreen`
   (popup de unidad + corrección del escaneo de empaque + búsqueda en el
   servidor por el código de `product.uom`, una sola vez por escaneo).
+- `static/src/overrides/linea_misma_unidad.js`: patch de `PosOrderline` para que
+  dos líneas del mismo producto solo se junten si se vendieron en la misma
+  unidad de venta. Va junto con «Agrupar en el punto de venta» encendido en las
+  unidades base (`scripts/corte/configurar_unidades_caja.py`): sin este patch,
+  una caja y un suelto del mismo producto se fundirían.
 
 ## Prueba post-merge
 
@@ -43,3 +48,5 @@ caja**: ½ caja de 18 = 9 und a 440.00 (tarifa caja 48.89), no a precio suelto.
 2. POS → tocar GALLETAS GUARINA SALADA → popup con Paquete 55 / Caja de 18 880
 3. Elegir caja → línea de 18 paquetes, total 880
 4. Escanear un barcode de empaque real (los migrados del ensayo #1) → mismo efecto
+5. Escanear dos veces el mismo producto suelto → UNA línea con cantidad 2
+6. Escanear la caja y después el suelto del mismo producto → DOS líneas
