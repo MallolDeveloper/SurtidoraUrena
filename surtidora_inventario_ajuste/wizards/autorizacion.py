@@ -7,7 +7,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
 
-from ..models.ajuste import CTX_VALE
+from ..models.ajuste import CTX_FECHA, CTX_VALE
 
 _GRUPO_AUTORIZADOR = 'surtidora_autorizacion_precio.group_autorizador_precio'
 _MAX_LINEAS_RESUMEN = 25
@@ -121,7 +121,8 @@ class AjusteAutorizacion(models.TransientModel):
         })
         try:
             resultado = quants.with_context(
-                **{CTX_VALE: vale.token}).action_apply_inventory()
+                **{CTX_VALE: vale.token}).action_apply_inventory(
+                    self.env.context.get(CTX_FECHA))
         finally:
             # el vale vale para UNA aplicación, salga bien o mal
             vale.sudo().usado = True
