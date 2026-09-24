@@ -3,6 +3,7 @@ import { _t } from "@web/core/l10n/translation";
 import { ProductScreen } from "@point_of_sale/app/screens/product_screen/product_screen";
 import { SelectionPopup } from "@point_of_sale/app/components/popups/selection_popup/selection_popup";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
+import { fraccionesDeEmpaque } from "@surtidora_pos_empaques/overrides/fraccion_caja";
 
 /**
  * Venta por empaque y fraccionamiento en el POS (Surtidora Ureña).
@@ -31,12 +32,6 @@ import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
  * (por si el producto se creó entre medio).
  */
 const busquedasEnServidor = new WeakMap();
-
-const FRACCIONES = [
-    { f: 0.25, txt: "¼" },
-    { f: 0.5, txt: "½" },
-    { f: 0.75, txt: "¾" },
-];
 
 patch(ProductScreen.prototype, {
     /** Empaques del producto: UdM adicionales con factor > 1. */
@@ -78,11 +73,9 @@ patch(ProductScreen.prototype, {
                 item: { qty: factor, uom },
             });
             if (productTemplate.surtidora_caja_fraccionable) {
-                for (const { f, txt } of FRACCIONES) {
-                    const qty = factor * f;
-                    if (!Number.isInteger(qty)) {
-                        continue; // solo fracciones que den unidades enteras
-                    }
+                // las mismas fracciones que RB-01 reconoce como legítimas
+                // (fraccion_caja.js): solo las que dan unidades enteras
+                for (const { txt, qty } of fraccionesDeEmpaque(factor)) {
                     opciones.push({
                         id: ++id,
                         label: `${txt} ${uom.name} (${qty} ${
