@@ -25,7 +25,8 @@ class StockPicking(models.Model):
             and not mov.product_uom.is_zero(mov.product_uom_qty))
         # sudo: el almacenista no necesita permisos de ventas para que se
         # revise la línea de venta de lo que va a entregar
-        movimientos.sudo().sale_line_id.filtered(
-            'surtidora_confirmada_sin_autorizar',
-        )._surtidora_frenar_retenidas(_('entregar'))
+        lineas = movimientos.sudo().sale_line_id.filtered(
+            'surtidora_confirmada_sin_autorizar')
+        lineas._surtidora_frenar_retenidas(_('entregar'))
+        lineas._surtidora_frenar_doble_entrega(movimientos.sudo())
         return super().button_validate()

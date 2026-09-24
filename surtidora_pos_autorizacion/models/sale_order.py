@@ -13,7 +13,7 @@ cobró 45.00 de la S00044 con la excepción bajo costo autorizada con PIN; la
 sincronización cayó con «Venta BAJO COSTO bloqueada», la venta no subió y
 terminó cancelada al cerrar la caja con el pago dentro.
 
-Tres piezas:
+Cuatro piezas:
 
 1. La autorización que la caja pidió con motivo + PIN cubre la línea de la
    cotización que se cobró con ella, con los mismos límites que una de
@@ -28,8 +28,14 @@ Tres piezas:
    anticipo): sin este freno, lo que nunca pasó por la caja quedaba
    confirmado, con su entrega viva, sin ningún control. Se libera cuando un
    supervisor la autoriza con «Autorizar precios» (RB-01), cuando se corrige
-   el precio o cuando se quita la cantidad que no pasó por la caja; lo que va
+   el precio o cuando la línea se baja a lo que cobró la caja; lo que va
    BAJO COSTO no admite PIN en oficina (RB-08).
+4. Tampoco sale del almacén lo que la caja ya entregó. sale_stock no cuenta
+   la salida de la caja (sus movimientos no llevan la línea de venta): al
+   bajar la línea a lo cobrado, su entrega pendiente se queda justo con lo
+   que la caja despachó, y volver a confirmar la orden rehace la entrega
+   completa. La entrega de una línea marcada no puede pasar de lo pedido
+   menos lo entregado; lo que sobra se cancela en la entrega.
 
 Confirmar desde oficina no cambia: pasa por el candado de siempre.
 """
@@ -101,7 +107,9 @@ class SaleOrder(models.Model):
             'sin una autorización que las cubra. Mientras sigan así no se '
             'pueden entregar ni facturar desde oficina: un supervisor las '
             'autoriza con «Autorizar precios», o se corrige el precio, o se '
-            'quita la cantidad que no pasó por la caja.',
+            'baja la línea a lo que cobró la caja y se cancela lo que quede en '
+            'su entrega pendiente (la entrega no descuenta lo que ya salió por '
+            'la caja).',
             ', '.join(v.pos_reference or v.name for v in ventas))
         detalle = ['• ' + linea._surtidora_renglon_de_constancia() for linea in lineas]
         self.sudo().message_post(
@@ -156,12 +164,46 @@ class SaleOrderLine(models.Model):
             'pero estas líneas van por debajo de la lista o del costo sin una '
             'autorización que las cubra:\n%(lineas)s\n\n'
             'Un supervisor debe autorizarlas con «Autorizar precios», o hay que '
-            'corregir el precio o quitar la cantidad que no pasó por la caja. '
-            'Lo que va BAJO COSTO no admite PIN en oficina (RB-08).',
+            'corregir el precio, o bajar la línea a lo que cobró la caja y '
+            'cancelar lo que quede en su entrega pendiente (la entrega no '
+            'descuenta lo que ya salió por la caja). Lo que va BAJO COSTO no '
+            'admite PIN en oficina (RB-08).',
             accion=accion,
             lineas='\n'.join(
                 '  • %s: %s' % (linea.order_id.name, linea._surtidora_renglon_de_constancia())
                 for linea in retenidas)))
+
+    def _surtidora_frenar_doble_entrega(self, movimientos):
+        """Frena la entrega que despacharía otra vez lo que la caja ya
+        entregó.
+
+        sale_stock mide la entrega solo con los movimientos de la línea, y los
+        de la caja no la llevan. Si oficina baja una línea cobrada en parte
+        (10 → 4, la caja entregó 4), la entrega pendiente pasa de 6 a 4, la
+        línea queda cubierta y el almacén despacharía los 4 otra vez. Igual
+        al volver a confirmar la orden: la entrega nueva es por el total.
+        Lo que esta entrega saca de la línea no puede pasar de lo pedido menos
+        lo ya entregado (la caja incluida, pos_sale lo suma)."""
+        repetidas = self.filtered(
+            lambda linea: linea.product_uom_id.compare(
+                sum(mov.product_uom._compute_quantity(
+                        mov.product_uom_qty, linea.product_uom_id, round=False)
+                    for mov in movimientos if mov.sale_line_id == linea),
+                max(linea.product_uom_qty - linea.qty_delivered, 0.0)) > 0)
+        if not repetidas:
+            return
+        raise UserError(_(
+            'No se puede entregar: la caja ya entregó parte de estas líneas y '
+            'esta entrega lo volvería a despachar:\n%(lineas)s\n\n'
+            'Cancele en la entrega lo que sobra (o la entrega completa si ya no '
+            'queda nada por entregar).',
+            lineas='\n'.join(
+                _('  • %(orden)s: %(producto)s: pedido %(pedido).2f, ya entregado '
+                  '%(entregado).2f (caja incluida) %(unidad)s',
+                  orden=linea.order_id.name, producto=linea.product_id.display_name,
+                  pedido=linea.product_uom_qty, entregado=linea.qty_delivered,
+                  unidad=linea.product_uom_id.name)
+                for linea in repetidas)))
 
     def _surtidora_renglon_de_constancia(self):
         """Un renglón de la nota: precio contra lista, si va bajo costo y
@@ -179,7 +221,7 @@ class SaleOrderLine(models.Model):
         else:
             caja = _('NO pasó por la caja')
         bajo_costo = (_(' — BAJO COSTO: el PIN no aplica en oficina; se corrige '
-                        'el precio o se quita la cantidad')
+                        'el precio o se baja la línea a lo que cobró la caja')
                       if self._bajo_costo_bloqueado() else '')
         return _('%(producto)s: %(precio).2f (lista: %(lista).2f), %(caja)s%(costo)s',
                  producto=self.product_id.display_name,
