@@ -22,12 +22,19 @@ regla RB-08 ya validada en el backend.
 - RB-01: al COBRAR, las líneas por debajo del precio de lista (menos la
   tolerancia de la compañía) piden motivo del catálogo + PIN de supervisor,
   sin doble confirmación, y quedan en la misma bitácora.
+
+- Cotización cobrada en caja (pos_sale, P19): la autorización de la caja
+  cubre la línea de la cotización que se cobró con ella, y la confirmación
+  que pos_sale hace al guardar el cobro ya no puede tumbar la venta; lo que
+  quede sin cubrir se anota en la orden para que un supervisor lo revise.
     """,
     'version': '19.0.2.0.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
-    'depends': ['point_of_sale', 'surtidora_autorizacion_precio'],
+    # pos_sale: la cotización cobrada en caja (P19). Ya estaba instalado por
+    # surtidora_pos_tirilla, que también depende de él.
+    'depends': ['point_of_sale', 'pos_sale', 'surtidora_autorizacion_precio'],
     'assets': {
         'point_of_sale._assets_pos': [
             'surtidora_pos_autorizacion/static/src/**/*',
