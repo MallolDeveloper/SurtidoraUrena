@@ -30,10 +30,11 @@ venta llevará NCF con el módulo fiscal):
 - Devolución facturada con bono: su RINV ya es el saldo a favor; no se
   vuelve a sumar.
 - Devolución de un fiado a Crédito (DC-5): el cierre la aplica a la deuda
-  (primero la venta devuelta, después FIFO). Con la caja abierta el panel
-  ya la pinta así (`_plan_devoluciones` del módulo de crédito): baja la
-  deuda o lo fiado hoy, no sube el saldo a favor. Si el cliente no debe
-  nada, sí es saldo a favor.
+  de su misma cuenta por cobrar (primero la venta devuelta, después FIFO;
+  los cheques devueltos de apertura van en otra cuenta y no se tocan). Con
+  la caja abierta el panel ya la pinta así (`_plan_devoluciones` del módulo
+  de crédito): baja la deuda o lo fiado hoy, no sube el saldo a favor. Si
+  el cliente no debe nada en esa cuenta, sí es saldo a favor.
 
 ## Diseño
 

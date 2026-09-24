@@ -51,6 +51,13 @@ class PosCredito(models.AbstractModel):
         # sudo puntual: la cajera no tiene acceso contable, pero el candado
         # necesita leer el balance por cobrar del cliente.
         cliente = self.sudo().env['res.partner'].browse(int(partner_id))
+        if float(monto) <= 0:
+            # DC-5: mandar algo a la cuenta del cliente (la devolución de un
+            # fiado, un abono) nunca crea deuda, así que no pasa por el
+            # límite. Sin esto, al cliente sin crédito activo (el moroso al
+            # que se lo cortaron) el POS no le dejaba poner Crédito negativo
+            # y la devolución de su fiado solo podía salir como bono.
+            return self._veredicto(True, '', cliente=cliente)
         # el crédito vive en la entidad comercial (matriz), no en el contacto
         comercial = cliente.commercial_partner_id
         if not comercial.use_partner_credit_limit or comercial.credit_limit <= 0:
@@ -240,9 +247,12 @@ class PosCredito(models.AbstractModel):
                 ('payment_method_id.surtidora_es_bono', '=', False)]
 
     @api.model
-    def _es_fiado(self, pago):
-        metodo = pago.payment_method_id
+    def _es_metodo_fiado(self, metodo):
         return metodo.type == 'pay_later' and not metodo.surtidora_es_bono
+
+    @api.model
+    def _es_fiado(self, pago):
+        return self._es_metodo_fiado(pago.payment_method_id)
 
     @api.model
     def _es_devolucion_a_cuenta(self, pago):
@@ -275,6 +285,14 @@ class PosCredito(models.AbstractModel):
         vacio = self.env['account.move.line']
         apuntes = {}
         for pago in pagos:
+            if pago.account_move_id:
+                # devolución de una RINV mixta ya separada por su asiento
+                # puente: lo que falta aplicar vive ahí, no en la RINV
+                # (pos.session._surtidora_puente_devolucion). Odoo no le pone
+                # asiento propio a un pago pay_later.
+                apuntes[pago] = pago.account_move_id.line_ids.filtered(
+                    lambda l: l.account_id.account_type == 'asset_receivable')
+                continue
             factura = pago.pos_order_id.account_move
             apuntes[pago] = factura.line_ids.filtered(
                 lambda l: l.account_id.account_type == 'asset_receivable'
@@ -300,9 +318,15 @@ class PosCredito(models.AbstractModel):
         para que dos iguales no tomen el mismo apunte. Primero por el
         nombre, que el core arma «<sesión> - <método>» (una devolución a
         Crédito y otra a Bono por lo mismo); si el idioma del cierre fue
-        otro, por monto."""
+        otro, por monto.
+
+        Las órdenes son las MISMAS que recorre el core (_get_closed_orders:
+        sin borradores ni canceladas, y sin factura): un pago de una orden
+        cancelada del mismo cliente y monto no tiene apunte y le quitaba el
+        suyo a un pago real."""
         moneda = sesion.currency_id
-        pagos = sesion.order_ids.filtered(lambda o: not o.account_move).payment_ids.filtered(
+        ordenes = sesion._get_closed_orders().filtered(lambda o: not o.is_invoiced)
+        pagos = ordenes.payment_ids.filtered(
             lambda p: p.payment_method_id.type == 'pay_later'
             and p.payment_method_id.split_transactions
             and not moneda.is_zero(p.amount))
@@ -336,9 +360,11 @@ class PosCredito(models.AbstractModel):
 
         tope = min(Σ Crédito negativo, lo abierto de sus apuntes): en una
         RINV mixta (Crédito + Bono) solo la parte de la cuenta rebaja
-        deuda; la del bono sigue siendo saldo a favor. Una orden cuyo pago
-        ya tiene asiento puente (account_move_id) ya se aplicó
-        (idempotencia del cierre).
+        deuda; la del bono sigue siendo saldo a favor. Si esa parte ya se
+        separó con un asiento puente, lo pendiente es lo que el puente
+        todavía tiene abierto (_apuntes_por_pago): así una segunda pasada
+        aplica el resto y nunca más de la cuenta. Lo ya conciliado no
+        vuelve a salir (idempotencia del cierre).
 
         Única fuente para el cierre de sesión y para el plan que usan el
         candado del bono y el panel."""
@@ -347,8 +373,6 @@ class PosCredito(models.AbstractModel):
         apuntes = self._apuntes_por_pago(pagos)
         rounding = self.env.company.currency_id.rounding
         for orden, pagos_orden in pagos.grouped('pos_order_id').items():
-            if pagos_orden.account_move_id:
-                continue
             creditos = self.env['account.move.line'].union(
                 *(apuntes[p] for p in pagos_orden)).filtered(
                 lambda l: not l.reconciled and l.amount_residual < 0)
@@ -394,25 +418,60 @@ class PosCredito(models.AbstractModel):
             lambda p: p.partner_id.commercial_partner_id == comercial)
         return abiertas | cerradas
 
+    def _cuenta_del_cliente(self, comercial):
+        """La CxC donde el cierre asienta lo fiado y lo devuelto SIN
+        factura: la del cliente contable (_get_split_receivable_vals del
+        core)."""
+        return comercial.with_company(self.env.company).property_account_receivable_id
+
     def _deudas_disponibles(self, comercial):
-        """{deuda: lo que admite}, en el orden en que el cierre las rebaja
-        (FIFO: las que vencen primero, primero):
-        - apuntes por cobrar abiertos, menos los reservados por un bono;
-        - lo fiado HOY en órdenes sin factura de cajas abiertas (la orden
-          es la clave): todavía no está en contabilidad, pero su cierre
-          creará la deuda contra la que se aplicará la devolución."""
+        """Deudas que los cierres pendientes pueden rebajar, en el orden en
+        que el cierre las toma: {deuda: {'monto', 'cuenta', 'reservada'}}.
+
+        - Apuntes por cobrar abiertos (FIFO: los que vencen primero), menos
+          las facturas que un bono va a pagar.
+        - Lo fiado HOY en órdenes sin factura de cajas abiertas (la orden es
+          la clave): todavía no está en contabilidad, pero su cierre creará
+          la deuda, en la CxC del cliente.
+        - Al final (reservada=True), lo que una factura pagada con bono +
+          Crédito deja abierto DESPUÉS del bono: el cierre lo rebaja en su
+          segunda pasada, cuando el bono ya se aplicó. Sacar la factura
+          entera mostraba con la caja abierta más bono que después del
+          cierre."""
         env = self.sudo().env
-        reservadas = self._deudas_reservadas_bono(self._pagos_bono_facturados(comercial))
+        bonos = self._bono_por_conciliar(self._pagos_bono_facturados(comercial))
+        reservadas = env['account.move.line'].union(*(p['lineas'] for p in bonos))
         lineas = env['account.move.line'].search(
             self._dominio_deudas(comercial, self.env.company),
             order='date_maturity, date, id') - reservadas
-        disponibles = {linea: linea.amount_residual for linea in lineas}
+        disponibles = {linea: {'monto': linea.amount_residual, 'cuenta': linea.account_id,
+                               'reservada': False} for linea in lineas}
         fiado = env['pos.payment'].search(
             self._dominio_sesion_abierta(comercial) + self._dominio_sin_factura()
             + self._dominio_fiado() + [('amount', '>', 0)])
+        cuenta = self._cuenta_del_cliente(comercial)
         for venta, pagos in fiado.grouped('pos_order_id').items():
-            disponibles[venta] = sum(pagos.mapped('amount'))
+            disponibles[venta] = {'monto': sum(pagos.mapped('amount')), 'cuenta': cuenta,
+                                  'reservada': False}
+        for pendiente in bonos:
+            for linea, resto in self._resto_tras_bono(pendiente).items():
+                disponibles[linea] = {'monto': resto, 'cuenta': linea.account_id,
+                                      'reservada': True}
         return disponibles
+
+    @api.model
+    def _resto_tras_bono(self, pendiente):
+        """{apunte: lo que le queda abierto} a una factura después de que el
+        cierre le aplique el bono (el tope de _bono_por_conciliar), las
+        líneas que vencen primero, primero: el mismo reparto que usa el
+        panel (_residual_sin_bono_pendiente)."""
+        resto, bono = {}, pendiente['tope']
+        for linea in pendiente['lineas'].sorted(lambda l: (l.date_maturity or l.date, l.id)):
+            aplicado = min(bono, linea.amount_residual)
+            bono -= aplicado
+            if linea.amount_residual - aplicado > 0:
+                resto[linea] = linea.amount_residual - aplicado
+        return resto
 
     def _plan_devoluciones(self, comercial):
         """Lo que los cierres pendientes harán con las devoluciones a
@@ -420,8 +479,9 @@ class PosCredito(models.AbstractModel):
         que después del cierre (igual que _bonos_usados con los bonos).
 
         Simula pos.session._surtidora_aplicar_devoluciones: cada devolución
-        rebaja primero la deuda de la venta devuelta y después las demás
-        (FIFO). Lo que no encuentra deuda es saldo a favor legítimo.
+        rebaja, en su misma CxC, primero la deuda de la venta devuelta,
+        después las demás (FIFO) y al final lo que un bono deja abierto en
+        su factura. Lo que no encuentra deuda es saldo a favor legítimo.
 
         Devuelve el ajuste de cada cifra del panel:
         - a_favor: saldo a favor que va a la deuda (negativo), o el sobrante
@@ -432,25 +492,26 @@ class PosCredito(models.AbstractModel):
         pagos = self._devoluciones_pendientes(comercial)
         if not pagos:
             return plan
-        contabilizadas = {p['orden']: p['tope']
-                          for p in self._devoluciones_por_aplicar(pagos)}
+        contabilizadas = {p['orden']: p for p in self._devoluciones_por_aplicar(pagos)}
         disponibles = self._deudas_disponibles(comercial)
         rounding = self.env.company.currency_id.rounding
         for devolucion, pagos_dev in sorted(pagos.grouped('pos_order_id').items(),
                                             key=lambda par: par[0].id):
             contabilizada = devolucion in contabilizadas
             if contabilizada:
-                resto = contabilizadas[devolucion]
+                resto = contabilizadas[devolucion]['tope']
+                cuenta = contabilizadas[devolucion]['creditos'][:1].account_id
             elif devolucion.session_id.state != 'closed' \
                     and devolucion.account_move.state != 'posted':
                 resto = -sum(pagos_dev.mapped('amount'))
+                cuenta = self._cuenta_del_cliente(comercial)
             else:
                 continue  # ya se aplicó al cerrar su caja
-            for deuda in self._deudas_en_orden(devolucion, disponibles):
-                toma = min(resto, disponibles[deuda])
+            for deuda in self._deudas_en_orden(devolucion, disponibles, cuenta):
+                toma = min(resto, disponibles[deuda]['monto'])
                 if float_compare(toma, 0.0, precision_rounding=rounding) <= 0:
                     continue
-                disponibles[deuda] -= toma
+                disponibles[deuda]['monto'] -= toma
                 resto -= toma
                 if deuda._name == 'pos.order':
                     plan['en_sesion'] -= toma      # fiado de hoy que se rebaja
@@ -468,12 +529,22 @@ class PosCredito(models.AbstractModel):
                 plan['en_sesion'] += resto
         return plan
 
-    def _deudas_en_orden(self, devolucion, disponibles):
-        """Primero la deuda de la venta devuelta, después las demás."""
+    def _deudas_en_orden(self, devolucion, disponibles, cuenta):
+        """Las deudas que la devolución puede rebajar, en el orden del
+        cierre. Solo las de su MISMA CxC: reconcile() no cruza cuentas, así
+        que el cierre deja fuera, p. ej., los cheques devueltos de apertura
+        (otra cuenta) y el plan tiene que dejarlos fuera también.
+
+        Primera pasada: la de la venta devuelta y después las demás (FIFO).
+        Segunda pasada: lo que libera el bono, también la venta primero.
+        sorted() es estable: dentro de cada grupo se conserva el FIFO."""
         apuntes, sin_contabilizar = self._deuda_de_venta(devolucion.refunded_order_id)
-        primero = list(apuntes) + ([devolucion.refunded_order_id] if sin_contabilizar else [])
-        primero = [d for d in primero if d in disponibles]
-        return primero + [d for d in disponibles if d not in primero]
+        de_la_venta = set(apuntes)
+        if sin_contabilizar:
+            de_la_venta.add(devolucion.refunded_order_id)
+        candidatas = [d for d, datos in disponibles.items() if datos['cuenta'] == cuenta]
+        return sorted(candidatas,
+                      key=lambda d: (disponibles[d]['reservada'], d not in de_la_venta))
 
     def _veredicto(self, permitido, motivo, cliente=None, balance=0.0,
                    disponible=0.0):

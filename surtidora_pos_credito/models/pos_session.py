@@ -17,9 +17,13 @@ Y ANTES de los bonos, la devolución de un fiado (DC-5): el Crédito negativo
 rebaja la deuda del cliente en vez de quedar como saldo a favor que se
 gasta como bono (_surtidora_aplicar_devoluciones).
 """
+import logging
+
 from odoo import Command, _, fields, models
-from odoo.exceptions import UserError
+from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 from odoo.tools import float_compare
+
+_logger = logging.getLogger(__name__)
 
 
 class PosSession(models.Model):
@@ -182,28 +186,84 @@ class PosSession(models.Model):
 
         Idempotente: solo trabaja lo que sigue abierto
         (_devoluciones_por_aplicar), así que un segundo cierre o un
-        reintento no concilia dos veces. Si una conciliación falla, el
-        cierre NO se cae: queda la nota en la sesión para CxC."""
+        reintento no concilia dos veces.
+
+        El cierre de la caja NO depende de esta conciliación auxiliar:
+        cualquier error, de datos o de código, deshace solo esta pasada (o
+        solo esa devolución), queda en el log y en una actividad para
+        contabilidad (_surtidora_avisar_cxc), y la caja cierra. Los choques
+        de concurrencia sí suben: con ellos Odoo reintenta el cierre entero."""
+        try:
+            with self.env.cr.savepoint():
+                self._surtidora_aplicar_devoluciones_caja()
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            raise
+        except Exception as error:
+            _logger.exception('DC-5: no se pudieron aplicar las devoluciones a '
+                              'cuenta del cierre de %s', self.name)
+            self._surtidora_avisar_cxc(self, _(
+                'Las devoluciones a la cuenta del cliente de esta caja no se '
+                'aplicaron a su deuda: %(error)s. Revisar y conciliar a mano en '
+                'CxC; mientras tanto ese crédito se puede gastar como bono.',
+                error=error))
+
+    def _surtidora_aplicar_devoluciones_caja(self):
+        """El trabajo de _surtidora_aplicar_devoluciones, devolución por
+        devolución: si una falla, las demás se aplican igual."""
         credito = self.env['surtidora.pos.credito'].sudo().with_company(self.company_id)
         pagos = self._surtidora_pagos_devolucion()
         if not pagos:
             return
         reservadas = self._surtidora_deudas_reservadas(pagos)
         for pendiente in credito._devoluciones_por_aplicar(pagos):
-            primero, en_otra_caja = credito._deuda_de_venta(
-                pendiente['orden'].refunded_order_id)
-            if en_otra_caja:
-                continue
             try:
                 with self.env.cr.savepoint():
+                    primero, en_otra_caja = credito._deuda_de_venta(
+                        pendiente['orden'].refunded_order_id)
+                    if en_otra_caja:
+                        continue
                     self._surtidora_aplicar_devolucion(
                         pendiente,
                         self._surtidora_deudas_a_rebajar(pendiente, primero) - reservadas)
-            except UserError as error:
-                self.message_post(body=_(
-                    'La devolución %(orden)s no se pudo aplicar a la deuda del '
-                    'cliente: %(error)s. Conciliarla a mano en CxC.',
-                    orden=pendiente['orden'].name, error=error))
+            except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+                raise
+            except Exception as error:
+                orden = pendiente['orden']
+                _logger.exception('DC-5: la devolución %s no se pudo aplicar', orden.name)
+                self._surtidora_avisar_cxc(orden.partner_id.commercial_partner_id, _(
+                    'La devolución %(orden)s (%(monto)s a la cuenta del cliente) '
+                    'no se pudo aplicar a su deuda al cerrar %(sesion)s: '
+                    '%(error)s. Conciliarla a mano en CxC; mientras tanto ese '
+                    'crédito se puede gastar como bono.',
+                    orden=orden.name, sesion=self.name,
+                    monto=self.company_id.currency_id.round(pendiente['tope']),
+                    error=error))
+
+    def _surtidora_avisar_cxc(self, registro, texto):
+        """Deja el problema donde contabilidad lo ve: la nota en la sesión y
+        una actividad «Por hacer» en `registro` (el cliente, o la sesión si
+        falló la pasada entera) para cada administrador de contabilidad de
+        la compañía. Solo la nota en la sesión no la lee nadie, y el crédito
+        seguiría gastándose como bono sin que CxC se entere.
+
+        Tampoco puede tumbar el cierre: si el aviso mismo falla, queda en
+        el log."""
+        try:
+            with self.env.cr.savepoint():
+                self.message_post(body=texto)
+                grupo = self.env.ref('account.group_account_manager',
+                                     raise_if_not_found=False)
+                contadores = (grupo.all_user_ids if grupo else self.env['res.users']).filtered(
+                    lambda u: not u.share and self.company_id in u.company_ids)
+                for usuario in contadores or self.env.user:
+                    registro.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('Devolución a cuenta sin aplicar (DC-5)'),
+                        note=texto, user_id=usuario.id)
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            raise
+        except Exception:
+            _logger.exception('DC-5: no se pudo avisar a CxC en %s: %s', self.name, texto)
 
     def _surtidora_pagos_devolucion(self):
         """Pagos de devolución a cuenta que toca este cierre: los de sus
@@ -245,16 +305,17 @@ class PosSession(models.Model):
         (reconcile() de un lote las reordena por fecha).
 
         RINV mixta (Crédito + Bono): reconcile() no admite tope y se
-        comería el bono, así que un asiento puente aplica exactamente la
-        parte de la cuenta que encuentra deuda (_surtidora_puente_devolucion)
-        y la marca como aplicada."""
+        comería el bono, así que un asiento puente separa ENTERA la parte de
+        la cuenta (_surtidora_puente_devolucion) y es ese apunte el que se
+        concilia. Si hoy no encuentra deuda para todo, lo que sobra queda
+        abierto en el puente y la segunda pasada del cierre (o el cierre de
+        la caja de la venta) lo sigue aplicando; nunca toca el bono."""
         if not deudas:
             return
         moneda = self.company_id.currency_id
         creditos, tope = pendiente['creditos'], pendiente['tope']
         if moneda.compare_amounts(-sum(creditos.mapped('amount_residual')), tope) > 0:
-            creditos = self._surtidora_puente_devolucion(
-                pendiente, moneda.round(min(tope, sum(deudas.mapped('amount_residual')))))
+            creditos = self._surtidora_puente_devolucion(pendiente, moneda.round(tope))
         for deuda in deudas:
             abiertos = creditos.filtered(lambda l: not l.reconciled)
             if not abiertos:
@@ -263,9 +324,10 @@ class PosSession(models.Model):
 
     def _surtidora_puente_devolucion(self, pendiente, monto):
         """Asiento puente en el diario del POS (como el del bono): el debe
-        consume `monto` de la RINV y el haber, que devuelve, rebaja la
-        deuda. Queda en pos.payment.account_move_id: la devolución ya se
-        aplicó y el resto de la RINV sigue siendo el bono del cliente."""
+        consume `monto` (la parte de la cuenta) de la RINV y el haber, que
+        devuelve, es el crédito que rebaja la deuda. Queda en
+        pos.payment.account_move_id: desde ahí _apuntes_por_pago lee lo que
+        falta aplicar, y el resto de la RINV sigue siendo el bono."""
         creditos = pendiente['creditos']
         documento = creditos[:1].move_id
         base = {
