@@ -20,13 +20,34 @@ import { esDevolucion } from "@surtidora_pos_devoluciones/devoluciones/motivo_de
  * la clave solo aquí no sería un control: el navegador se salta con tres
  * llamadas, que es exactamente lo que ya pasó con el candado de precios.
  */
+
+/**
+ * El vuelto no es una devolución. Odoo 19 lo guarda como pago en efectivo
+ * (`is_change`) con el signo CONTRARIO al del pago al que pertenece, así
+ * que el signo decide leído al revés si es vuelto. Mismo criterio que el
+ * servidor (`_surtidora_es_devolucion_de_efectivo`) y que el cuadre de caja:
+ * si divergen, la clave se pide por un monto y el tope mide otro.
+ */
+function esDevolucionDeEfectivo(importe, esVuelto) {
+    return (importe < 0) !== Boolean(esVuelto);
+}
+
 function efectivoQueSale(orden) {
-    return (orden.payment_ids || []).reduce((total, pago) => {
+    // Hoy el vuelto no llega aquí como línea (el core lo crea al sincronizar,
+    // desde amount_return); si algún día llegara, no pediría clave por él.
+    const pagos = orden.payment_ids || [];
+    const total = pagos.reduce((suma, pago) => {
         const importe = pago.amount || 0;
-        return importe < 0 && pago.payment_method_id?.is_cash_count
-            ? total - importe
-            : total;
+        return pago.payment_method_id?.is_cash_count &&
+            esDevolucionDeEfectivo(importe, pago.is_change)
+            ? suma - importe
+            : suma;
     }, 0);
+    // Devolución pagada de más: `orden.change` es POSITIVO y el core lo
+    // asienta como vuelto en efectivo, que regresa a la gaveta (mismo
+    // criterio que `_surtidora_vuelto_que_regresa` del servidor).
+    const regresa = pagos.some((pago) => pago.is_change) ? 0 : Math.max(orden.change || 0, 0);
+    return Math.max(total - regresa, 0);
 }
 
 function ventaOriginal(orden) {

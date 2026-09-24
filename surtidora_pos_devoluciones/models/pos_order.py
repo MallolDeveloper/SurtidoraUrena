@@ -10,6 +10,7 @@ que el dato es real.
 Las reglas de la devolución en EFECTIVO, tal como las fijó el cliente:
 
     · el efectivo devuelto no puede pasar de lo que se pagó en efectivo
+      (NETO: lo recibido menos el vuelto)
     · tiene que ser la MISMA caja que facturó, y del MISMO día
     · si la gaveta no tiene efectivo suficiente, se bloquea
     · la autoriza un supervisor con su clave, y queda en bitácora
@@ -123,9 +124,9 @@ class PosOrder(models.Model):
                      dia=dia)
         disponible = self._surtidora_efectivo_devolvible(original)
         if efectivo > disponible + 0.001:
-            return _('De esta venta solo se pagaron %(pagado)s en efectivo, y '
-                     'ya se devolvieron %(devuelto)s. El resto lo tramita '
-                     'contabilidad.',
+            return _('De esta venta solo quedaron %(pagado)s en efectivo (lo '
+                     'pagado menos el vuelto), y ya se devolvieron '
+                     '%(devuelto)s. El resto lo tramita contabilidad.',
                      pagado=self.env.company.currency_id.round(
                          self._surtidora_pagado_en_efectivo(original)),
                      devuelto=self.env.company.currency_id.round(
@@ -145,15 +146,50 @@ class PosOrder(models.Model):
             ('lines.refunded_orderline_id', 'in', original.lines.ids),
             ('id', '!=', original.id),
         ])
+        # el vuelto de una hija (un cambio que salió con saldo a pagar) no
+        # es efectivo devuelto de ESTA venta
         devuelto = -sum(
             pago.amount for pago in hijas.payment_ids
-            if pago.payment_method_id.is_cash_count and pago.amount < 0)
+            if pago.payment_method_id.is_cash_count
+            and self._surtidora_es_devolucion_de_efectivo(
+                pago.amount, pago.is_change))
         return self._surtidora_pagado_en_efectivo(original) - devuelto
 
     @api.model
     def _surtidora_pagado_en_efectivo(self, original):
-        return sum(p.amount for p in original.payment_ids
-                   if p.payment_method_id.is_cash_count and p.amount > 0)
+        """El efectivo NETO que la venta dejó en la gaveta: recibido − vuelto.
+
+        En Odoo 19 el vuelto es un pago negativo en efectivo (`is_change`,
+        «devolver»). Sumando solo los positivos el tope era el BILLETE que
+        entregó el cliente, no lo que se quedó en la caja: la orden 47 de Dev
+        (+200 y −20 de vuelto) admitía devolver 200 en efectivo por una venta
+        de 180. Y con pago mixto era peor: 500 con tarjeta + un billete de
+        1,000 (vuelto 500) dejaba devolver en efectivo la venta ENTERA,
+        convirtiendo en efectivo lo que se cobró con tarjeta.
+
+        Nunca negativo: una venta que no dejó efectivo no tiene efectivo que
+        devolver.
+        """
+        neto = sum(
+            p.amount for p in original.payment_ids
+            if p.payment_method_id.is_cash_count
+            and not self._surtidora_es_devolucion_de_efectivo(
+                p.amount, p.is_change))
+        return max(neto, 0.0)
+
+    @api.model
+    def _surtidora_es_devolucion_de_efectivo(self, importe, es_vuelto):
+        """¿Este pago en efectivo es una DEVOLUCIÓN, o parte de una venta?
+
+        El vuelto no es una devolución. Odoo 19 lo guarda con el signo
+        CONTRARIO al pago al que pertenece: negativo en una venta (el cliente
+        dio 200 por 180) y positivo en una devolución pagada de más. Así que
+        el signo decide, leído al revés si es vuelto. Es el mismo criterio
+        que el cuadre de caja (surtidora_cuadre) y que la pantalla
+        (efectivo_devolucion.js): si divergen, el tope y el cuadre no
+        amarran.
+        """
+        return (importe < 0) != bool(es_vuelto)
 
     @api.model
     def _surtidora_hay_efectivo(self, sesion, efectivo):
@@ -192,6 +228,11 @@ class PosOrder(models.Model):
 
         Se mira `is_cash_count` del método, no su nombre: quien renombre
         «Efectivo» no debe poder saltarse el control sin querer.
+
+        El vuelto no cuenta como salida. En el primer envío ni siquiera viene
+        como línea (el core lo crea después, desde `amount_return`), pero una
+        orden que se reenvía ya lo trae como pago `is_change`: sin este
+        criterio, un cambio con saldo a pagar pediría clave por su vuelto.
         """
         metodos = {}
         total = 0.0
@@ -200,7 +241,8 @@ class PosOrder(models.Model):
                 continue
             valores = pago[2]
             importe = valores.get('amount') or 0.0
-            if importe >= 0:
+            if not self._surtidora_es_devolucion_de_efectivo(
+                    importe, valores.get('is_change')):
                 continue
             metodo_id = valores.get('payment_method_id')
             if metodo_id not in metodos:
@@ -208,7 +250,19 @@ class PosOrder(models.Model):
                     metodo_id).exists().is_cash_count
             if metodos[metodo_id]:
                 total += -importe
-        return total
+        return max(total - self._surtidora_vuelto_que_regresa(orden), 0.0)
+
+    @api.model
+    def _surtidora_vuelto_que_regresa(self, orden):
+        """En una devolución pagada de MÁS (se teclean −200 por −180), Odoo 19
+        manda la diferencia en `amount_return` con signo POSITIVO y la asienta
+        después como pago `is_change` en efectivo: esos 20 vuelven a la
+        gaveta, no salen. En una venta `amount_return` es negativo (el vuelto
+        que se entrega) y aquí no cuenta. Si la orden ya trae el vuelto como
+        línea (reenvío), el bucle de arriba ya lo descontó."""
+        ya_en_lineas = any(len(p) >= 3 and p[2].get('is_change')
+                           for p in orden.get('payment_ids') or [])
+        return 0.0 if ya_en_lineas else max(orden.get('amount_return') or 0.0, 0.0)
 
     @api.model
     def _surtidora_autorizacion_para(self, orden, efectivo):
