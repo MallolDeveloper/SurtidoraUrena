@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -139,8 +139,22 @@ class SaleOrderLine(models.Model):
     # que las dos reglas se vuelven a comprobar al escribir. En borrador no
     # hace falta: ahí manda action_confirm, y bloquear antes impediría armar
     # la cotización.
+    #
+    # Y al CREAR: agregar una línea a una orden confirmada no pasa por write
+    # (Odoo solo deja el mensaje «Extra line with…» y sale_stock lanza su
+    # entrega). Sin esto, una línea nueva bajo lista o bajo costo se entregaba
+    # y se facturaba sin PIN, y el freno de P19 no la veía porque nunca lleva
+    # la marca de la caja. Las líneas que el sistema agrega solo entran en
+    # cantidad 0 (anticipo de pos_sale, extra de sale_stock) o sin producto
+    # (secciones), y esas no piden nada.
     _CAMPOS_QUE_MUEVEN_EL_DINERO = (
         'price_unit', 'discount', 'product_uom_qty', 'product_uom_id', 'product_id')
+
+    @api.model_create_multi
+    def create(self, lista_valores):
+        lineas = super().create(lista_valores)
+        lineas._revalidar_orden_confirmada()
+        return lineas
 
     def write(self, valores):
         resultado = super().write(valores)
