@@ -32,6 +32,20 @@ cierre ya no crea el apunte por cobrar. Por eso:
   parte (bono + Crédito), un asiento puente en el diario del POS mueve
   exactamente el bono y el resto sigue como deuda del cliente.
 
+Devolución de un fiado (DC-5): un fiado no se devuelve en efectivo; va a la
+cuenta del cliente con Crédito negativo. Ese crédito (la RINV, o el apunte
+del cierre si no hay factura) REBAJA LA DEUDA, no es bono:
+- al cerrar la sesión se concilia contra las deudas abiertas del mismo
+  cliente: primero la de la venta devuelta, después FIFO por vencimiento
+  (antes de conciliar los bonos). Si la venta devuelta sigue en otra caja
+  abierta, se aplica al cerrar esa caja. Idempotente;
+- con la caja abierta, el candado del bono y el panel ya descuentan lo que
+  el cierre va a aplicar: el disponible es el mismo antes y después;
+- si el cliente no debe nada, queda como saldo a favor legítimo;
+- en una RINV mixta (Crédito + Bono) solo la parte de la cuenta rebaja
+  deuda (asiento puente); la del bono sigue siendo bono.
+Las notas de crédito de apertura (RAPCXC) no se tocan.
+
 La instalación agrega el método a las cajas existentes y activa la opción
 de límite de crédito por cliente en la compañía.
 
