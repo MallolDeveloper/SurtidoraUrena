@@ -23,6 +23,19 @@ class PosOrder(models.Model):
         ordenes._surtidora_enlazar_autorizaciones()
         return ordenes
 
+    def action_pos_order_paid(self):
+        """También al cobrarla: si la venta subió en borrador antes de que el
+        supervisor pusiera el PIN, el enlace de create no alcanzó sus filas.
+        Va antes de marcarla pagada porque pos_sale puede confirmar la
+        cotización dentro de ese mismo paso (pago en línea).
+
+        Después de cobrada ya no se enlaza nada (point_of_sale ignora la
+        venta que vuelve a subir ya pagada): una fila escrita más tarde con
+        la referencia de esta venta no la cubre. La cotización cobrada en
+        caja se ampara solo por este enlace (P19)."""
+        self._surtidora_enlazar_autorizaciones()
+        return super().action_pos_order_paid()
+
     def _surtidora_enlazar_autorizaciones(self):
         Auditoria = self.env['surtidora.autorizacion.precio'].sudo()
         for orden in self:

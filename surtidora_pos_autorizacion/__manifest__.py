@@ -24,12 +24,24 @@ regla RB-08 ya validada en el backend.
   sin doble confirmación, y quedan en la misma bitácora.
 - Una fracción de empaque (¼/½/¾, RB-09 de surtidora_pos_empaques) se
   compara contra la tarifa del empaque completo, que es su precio legítimo.
+
+- Cotización cobrada en caja (pos_sale, P19): la autorización de la caja
+  cubre la línea de la cotización que se cobró con ella, y la confirmación
+  que pos_sale hace al guardar el cobro ya no puede tumbar la venta. Lo que
+  quede sin cubrir (también lo que nunca pasó por la caja, porque pos_sale
+  confirma la cotización entera) queda marcado, con una nota en la orden, y
+  no se entrega ni se factura desde oficina hasta que se autorice o se
+  corrija.
     """,
     'version': '19.0.2.0.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
-    'depends': ['point_of_sale', 'surtidora_autorizacion_precio'],
+    # pos_sale: la cotización cobrada en caja (P19). Ya estaba instalado por
+    # surtidora_pos_tirilla, que también depende de él. sale_stock: el freno
+    # de la entrega mira la línea de venta del movimiento (instalado en Dev).
+    'depends': ['point_of_sale', 'pos_sale', 'sale_stock',
+                'surtidora_autorizacion_precio'],
     'assets': {
         'point_of_sale._assets_pos': [
             'surtidora_pos_autorizacion/static/src/**/*',
