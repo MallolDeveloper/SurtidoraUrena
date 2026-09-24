@@ -12,9 +12,18 @@ Dos caminos, según dónde deja Odoo la deuda del bono:
   cliente en el asiento de la sesión → se concilia contra sus créditos.
 - Orden FACTURADA: el cierre no crea ese apunte; la parte pagada con bono
   queda abierta en la factura → se concilia la factura contra sus créditos.
+
+Y ANTES de los bonos, la devolución de un fiado (DC-5): el Crédito negativo
+rebaja la deuda del cliente en vez de quedar como saldo a favor que se
+gasta como bono (_surtidora_aplicar_devoluciones).
 """
+import logging
+
 from odoo import Command, _, fields, models
+from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 from odoo.tools import float_compare
+
+_logger = logging.getLogger(__name__)
 
 
 class PosSession(models.Model):
@@ -26,17 +35,26 @@ class PosSession(models.Model):
         return res
 
     def _surtidora_conciliar_bonos(self):
-        """REQ-V18: aplica los bonos de la sesión recién cerrada.
+        """REQ-V18: aplica los bonos de la sesión recién cerrada, y DC-5:
+        las devoluciones a la cuenta del cliente.
 
         Solo si la sesión quedó cerrada: si el asiento de cierre no cuadra,
         Odoo revierte la transacción y devuelve el asistente — la sesión
         sigue abierta y conciliar ahí gastaría el bono dos veces (el candado
-        lo sigue contando como usado)."""
+        lo sigue contando como usado).
+
+        Las devoluciones van PRIMERO: si el bono corriera antes, podía
+        consumir el crédito de la devolución de un fiado (FIFO) y dejar
+        abierto un bono legítimo que se gastaría otra vez. Van otra vez al
+        final por la parte a Crédito de una factura pagada con bono +
+        Crédito, que solo queda libre cuando el bono ya se aplicó."""
         for sesion in self.sudo():
             if sesion.state != 'closed':
                 continue
+            sesion._surtidora_aplicar_devoluciones()
             sesion._surtidora_conciliar_bonos_sesion()
             sesion._surtidora_conciliar_bonos_facturas()
+            sesion._surtidora_aplicar_devoluciones()
 
     def _surtidora_pagos_bono(self):
         return self.order_ids.payment_ids.filtered(
@@ -148,3 +166,186 @@ class PosSession(models.Model):
         (haber + lineas).with_company(factura.company_id).reconcile()
         ((puente.line_ids - haber) + creditos).with_company(factura.company_id).reconcile()
         pendiente['pagos'].write({'account_move_id': puente.id})
+
+    # ------------------------------------------------------------------
+    # DC-5: la devolución de un fiado rebaja la deuda
+    # ------------------------------------------------------------------
+    def _surtidora_aplicar_devoluciones(self):
+        """Concilia el crédito de cada devolución a cuenta (Crédito
+        negativo) contra las deudas abiertas del MISMO cliente: primero la
+        de la venta devuelta, después las demás, las que vencen primero.
+
+        Sirve con y sin factura: el crédito es la RINV o el apunte del
+        cliente en el asiento de este cierre (_apuntes_por_pago). Aplica
+        las devoluciones de esta caja y las de otras cajas ya cerradas cuya
+        venta fiada es de esta sesión (su deuda recién entra a
+        contabilidad). Si la venta devuelta sigue en OTRA caja abierta, se
+        deja para el cierre de esa caja, que la aplica primero contra ella.
+        Si el cliente no debe nada, el crédito queda como saldo a favor
+        legítimo.
+
+        Idempotente: solo trabaja lo que sigue abierto
+        (_devoluciones_por_aplicar), así que un segundo cierre o un
+        reintento no concilia dos veces.
+
+        El cierre de la caja NO depende de esta conciliación auxiliar:
+        cualquier error, de datos o de código, deshace solo esta pasada (o
+        solo esa devolución), queda en el log y en una actividad para
+        contabilidad (_surtidora_avisar_cxc), y la caja cierra. Los choques
+        de concurrencia sí suben: con ellos Odoo reintenta el cierre entero."""
+        try:
+            with self.env.cr.savepoint():
+                self._surtidora_aplicar_devoluciones_caja()
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            raise
+        except Exception as error:
+            _logger.exception('DC-5: no se pudieron aplicar las devoluciones a '
+                              'cuenta del cierre de %s', self.name)
+            self._surtidora_avisar_cxc(self, _(
+                'Las devoluciones a la cuenta del cliente de esta caja no se '
+                'aplicaron a su deuda: %(error)s. Revisar y conciliar a mano en '
+                'CxC; mientras tanto ese crédito se puede gastar como bono.',
+                error=error))
+
+    def _surtidora_aplicar_devoluciones_caja(self):
+        """El trabajo de _surtidora_aplicar_devoluciones, devolución por
+        devolución: si una falla, las demás se aplican igual."""
+        credito = self.env['surtidora.pos.credito'].sudo().with_company(self.company_id)
+        pagos = self._surtidora_pagos_devolucion()
+        if not pagos:
+            return
+        reservadas = self._surtidora_deudas_reservadas(pagos)
+        for pendiente in credito._devoluciones_por_aplicar(pagos):
+            try:
+                with self.env.cr.savepoint():
+                    primero, en_otra_caja = credito._deuda_de_venta(
+                        pendiente['orden'].refunded_order_id)
+                    if en_otra_caja:
+                        continue
+                    self._surtidora_aplicar_devolucion(
+                        pendiente,
+                        self._surtidora_deudas_a_rebajar(pendiente, primero) - reservadas)
+            except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+                raise
+            except Exception as error:
+                orden = pendiente['orden']
+                _logger.exception('DC-5: la devolución %s no se pudo aplicar', orden.name)
+                self._surtidora_avisar_cxc(orden.partner_id.commercial_partner_id, _(
+                    'La devolución %(orden)s (%(monto)s a la cuenta del cliente) '
+                    'no se pudo aplicar a su deuda al cerrar %(sesion)s: '
+                    '%(error)s. Conciliarla a mano en CxC; mientras tanto ese '
+                    'crédito se puede gastar como bono.',
+                    orden=orden.name, sesion=self.name,
+                    monto=self.company_id.currency_id.round(pendiente['tope']),
+                    error=error))
+
+    def _surtidora_avisar_cxc(self, registro, texto):
+        """Deja el problema donde contabilidad lo ve: la nota en la sesión y
+        una actividad «Por hacer» en `registro` (el cliente, o la sesión si
+        falló la pasada entera) para cada administrador de contabilidad de
+        la compañía. Solo la nota en la sesión no la lee nadie, y el crédito
+        seguiría gastándose como bono sin que CxC se entere.
+
+        Tampoco puede tumbar el cierre: si el aviso mismo falla, queda en
+        el log."""
+        try:
+            with self.env.cr.savepoint():
+                self.message_post(body=texto)
+                grupo = self.env.ref('account.group_account_manager',
+                                     raise_if_not_found=False)
+                contadores = (grupo.all_user_ids if grupo else self.env['res.users']).filtered(
+                    lambda u: not u.share and self.company_id in u.company_ids)
+                for usuario in contadores or self.env.user:
+                    registro.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('Devolución a cuenta sin aplicar (DC-5)'),
+                        note=texto, user_id=usuario.id)
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            raise
+        except Exception:
+            _logger.exception('DC-5: no se pudo avisar a CxC en %s: %s', self.name, texto)
+
+    def _surtidora_pagos_devolucion(self):
+        """Pagos de devolución a cuenta que toca este cierre: los de sus
+        órdenes y los de las devoluciones de sus ventas fiadas."""
+        credito = self.env['surtidora.pos.credito']
+        pagos = self.order_ids.payment_ids
+        ventas = pagos.filtered(lambda p: credito._es_fiado(p) and p.amount > 0).pos_order_id
+        return (pagos.filtered(credito._es_devolucion_a_cuenta)
+                | credito._devoluciones_de_ventas(ventas))
+
+    def _surtidora_deudas_reservadas(self, pagos):
+        """Deudas que un bono va a pagar: las facturas con bono de esta
+        caja o de otra abierta (_deudas_reservadas_bono) y los apuntes de
+        los bonos sin factura de este cierre, que concilia
+        _surtidora_conciliar_bonos_sesion. Si la devolución las pagara, el
+        bono no encontraría qué pagar y quedaría para gastarse otra vez."""
+        credito = self.env['surtidora.pos.credito'].sudo().with_company(self.company_id)
+        bonos = self._surtidora_pagos_bono()
+        for comercial in pagos.partner_id.commercial_partner_id:
+            bonos |= credito._pagos_bono_facturados(comercial)
+        sin_factura = bonos.filtered(lambda p: p.session_id == self and p.amount > 0
+                                     and not p.pos_order_id.account_move)
+        return credito._deudas_reservadas_bono(bonos).union(
+            *credito._apuntes_por_pago(sin_factura).values())
+
+    def _surtidora_deudas_a_rebajar(self, pendiente, primero):
+        """Deudas del cliente del crédito, en su misma CxC y compañía:
+        `primero` (la de la venta devuelta) y después FIFO (vencimiento)."""
+        credito = self.env['surtidora.pos.credito'].sudo()
+        apunte = pendiente['creditos'][:1]
+        fifo = self.env['account.move.line'].sudo().search(
+            credito._dominio_deudas(apunte.partner_id, apunte.company_id)
+            + [('account_id', '=', apunte.account_id.id)],
+            order='date_maturity, date, id')
+        return (primero & fifo) | fifo
+
+    def _surtidora_aplicar_devolucion(self, pendiente, deudas):
+        """Concilia el crédito con las deudas, una por una y en orden
+        (reconcile() de un lote las reordena por fecha).
+
+        RINV mixta (Crédito + Bono): reconcile() no admite tope y se
+        comería el bono, así que un asiento puente separa ENTERA la parte de
+        la cuenta (_surtidora_puente_devolucion) y es ese apunte el que se
+        concilia. Si hoy no encuentra deuda para todo, lo que sobra queda
+        abierto en el puente y la segunda pasada del cierre (o el cierre de
+        la caja de la venta) lo sigue aplicando; nunca toca el bono."""
+        if not deudas:
+            return
+        moneda = self.company_id.currency_id
+        creditos, tope = pendiente['creditos'], pendiente['tope']
+        if moneda.compare_amounts(-sum(creditos.mapped('amount_residual')), tope) > 0:
+            creditos = self._surtidora_puente_devolucion(pendiente, moneda.round(tope))
+        for deuda in deudas:
+            abiertos = creditos.filtered(lambda l: not l.reconciled)
+            if not abiertos:
+                break
+            (abiertos + deuda).with_company(self.company_id).reconcile()
+
+    def _surtidora_puente_devolucion(self, pendiente, monto):
+        """Asiento puente en el diario del POS (como el del bono): el debe
+        consume `monto` (la parte de la cuenta) de la RINV y el haber, que
+        devuelve, es el crédito que rebaja la deuda. Queda en
+        pos.payment.account_move_id: desde ahí _apuntes_por_pago lee lo que
+        falta aplicar, y el resto de la RINV sigue siendo el bono."""
+        creditos = pendiente['creditos']
+        documento = creditos[:1].move_id
+        base = {
+            'account_id': creditos[:1].account_id.id,
+            'partner_id': creditos[:1].partner_id.id,
+            'name': _('Devolución a cuenta de %(orden)s', orden=pendiente['orden'].name),
+        }
+        puente = self.env['account.move'].sudo().with_company(self.company_id).create({
+            'move_type': 'entry',
+            'journal_id': self.config_id.journal_id.id,
+            'date': fields.Date.context_today(self),
+            'ref': _('Devolución a cuenta de %(orden)s (%(documento)s)',
+                     orden=pendiente['orden'].name, documento=documento.name),
+            'line_ids': [Command.create({**base, 'balance': monto}),
+                         Command.create({**base, 'balance': -monto})],
+        })
+        puente._post()
+        debe = puente.line_ids.filtered(lambda l: l.balance > 0)
+        (debe + creditos).with_company(self.company_id).reconcile()
+        pendiente['pagos'].write({'account_move_id': puente.id})
+        return puente.line_ids - debe
