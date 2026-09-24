@@ -173,8 +173,23 @@ patch(OrderPaymentValidation.prototype, {
             (linea) =>
                 linea.surtiBajoLista &&
                 !linea.surtiBajoCosto &&
-                !(ok[linea.uuid] !== undefined &&
-                    linea.surtiPrecioEfectivoConItbis >= ok[linea.uuid] - 0.005)
+                !this._surtiAutorizacionCubre(
+                    ok[linea.uuid], linea, linea.surtiPrecioEfectivoConItbis)
+        );
+    },
+
+    /** ¿La autorización que ya se dio en esta venta sigue cubriendo la
+     * línea? Los mismos límites que el servidor (sigue_vigente_para): no
+     * cubre un precio más bajo que el autorizado NI más cantidad que la
+     * autorizada. Antes solo se recordaba el precio: con el PIN puesto para
+     * 1 unidad se subía la cantidad a 500 y no se volvía a pedir, y la
+     * bitácora se quedaba con 1. Una autorización guardada con el formato
+     * viejo (solo el número) no cubre: se vuelve a pedir el PIN. */
+    _surtiAutorizacionCubre(autorizada, linea, precio) {
+        return (
+            typeof autorizada?.precio === "number" &&
+            precio >= autorizada.precio - 0.005 &&
+            linea.qty <= autorizada.cantidad + 0.00001
         );
     },
 
@@ -204,7 +219,7 @@ patch(OrderPaymentValidation.prototype, {
         }
         const ok = this.order.uiState.surtiBajoListaOk || {};
         for (const linea of lineas) {
-            ok[linea.uuid] = linea.surtiPrecioEfectivoConItbis;
+            ok[linea.uuid] = { precio: linea.surtiPrecioEfectivoConItbis, cantidad: linea.qty };
         }
         this.order.uiState.surtiBajoListaOk = ok;
         this.pos.notification.add(
@@ -212,15 +227,15 @@ patch(OrderPaymentValidation.prototype, {
         return true;
     },
 
-    /** Líneas bajo costo SIN autorización vigente (si el precio bajó más
-     * después de autorizar, se re-autoriza — misma regla del backend). */
+    /** Líneas bajo costo SIN autorización vigente (si el precio bajó más o
+     * la cantidad subió después de autorizar, se re-autoriza — misma regla
+     * del backend). */
     _surtiLineasBajoCosto() {
         const ok = this.order.uiState.surtiBajoCostoOk || {};
         return this.order.lines.filter(
             (linea) =>
                 linea.surtiBajoCosto &&
-                !(ok[linea.uuid] !== undefined &&
-                    linea.surtiPrecioEfectivo >= ok[linea.uuid] - 0.005)
+                !this._surtiAutorizacionCubre(ok[linea.uuid], linea, linea.surtiPrecioEfectivo)
         );
     },
 
@@ -252,7 +267,7 @@ patch(OrderPaymentValidation.prototype, {
 
         const ok = this.order.uiState.surtiBajoCostoOk || {};
         for (const linea of lineas) {
-            ok[linea.uuid] = linea.surtiPrecioEfectivo;
+            ok[linea.uuid] = { precio: linea.surtiPrecioEfectivo, cantidad: linea.qty };
         }
         this.order.uiState.surtiBajoCostoOk = ok;
         this.pos.notification.add(
