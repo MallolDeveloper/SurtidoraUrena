@@ -38,6 +38,15 @@ Cuatro piezas:
    menos lo entregado; lo que sobra se cancela en la entrega.
 
 Confirmar desde oficina no cambia: pasa por el candado de siempre.
+
+Lo que esto NO cubre: solo el candado de precios deja de tumbar el cobro.
+Cualquier otro error dentro de action_confirm sigue deshaciendo toda la
+sincronización, y la venta de caja no sube: permisos de la cajera (la
+confirmación corre con su usuario; sin acceso a Ventas ni siquiera carga el
+pedido, y con «Ventas / Usuario: solo documentos propios» la regla
+«Personal Orders» le esconde los de otro vendedor, así que la que cobra
+cotizaciones necesita «todos los documentos»), recompensas de sale_loyalty
+o el abastecimiento de sale_stock.
 """
 from markupsafe import Markup, escape
 

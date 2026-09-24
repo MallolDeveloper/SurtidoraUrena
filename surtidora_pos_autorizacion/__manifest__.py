@@ -26,8 +26,10 @@ regla RB-08 ya validada en el backend.
   compara contra la tarifa del empaque completo, que es su precio legítimo.
 
 - Cotización cobrada en caja (pos_sale, P19): la autorización de la caja
-  cubre la línea de la cotización que se cobró con ella, y la confirmación
-  que pos_sale hace al guardar el cobro ya no puede tumbar la venta. Lo que
+  cubre la línea de la cotización que se cobró con ella, y el candado de
+  precios ya no tumba la venta en la confirmación que pos_sale hace al
+  guardar el cobro (otro error ahí, como los permisos de la cajera sobre la
+  orden de venta, sí la tumba: ver models/sale_order.py). Lo que
   quede sin cubrir (también lo que nunca pasó por la caja, porque pos_sale
   confirma la cotización entera) queda marcado, con una nota en la orden, y
   no se entrega ni se factura desde oficina hasta que se autorice o se
