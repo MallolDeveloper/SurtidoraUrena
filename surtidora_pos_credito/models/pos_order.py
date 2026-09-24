@@ -23,33 +23,45 @@ from odoo.tools import float_compare
 class PosOrder(models.Model):
     _inherit = 'pos.order'
 
-    @api.model
-    def sync_from_ui(self, orders):
-        for orden in orders:
-            self._surtidora_revisar_devolucion_fiado(orden)
-        return super().sync_from_ui(orders)
+    def _process_saved_order(self, draft):
+        """La compuerta corre al cobrar, sobre la orden YA guardada.
 
-    @api.model
-    def _surtidora_revisar_devolucion_fiado(self, orden):
-        """Compuerta del servidor sobre el diccionario que manda el mostrador.
+        No sobre el diccionario que manda el mostrador: el POS 19 no reenvía
+        las líneas ni los pagos que ya subieron y no cambiaron
+        (related_models/serialization.js). Una devolución que subió antes en
+        borrador (por ejemplo, al sincronizar la venta del siguiente cliente)
+        llega al cobrarla con `lines: []` y `payment_ids: []`; revisando el
+        diccionario no se encontraba la venta devuelta y el bono pasaba.
 
-        En la devolución de una venta fiada, lo que sale POR FUERA de la
+        Aquí la orden ya tiene todas sus líneas y todos sus pagos, incluido
+        el vuelto que el core acaba de asentar como línea `is_change`
+        (_process_payment_lines corre justo antes). Un UserError deshace
+        toda la sincronización, igual que antes: la caja devuelve la orden a
+        borrador."""
+        if not draft and self.state != 'cancel':
+            self._surtidora_revisar_devolucion_fiado()
+        return super()._process_saved_order(draft)
+
+    def _surtidora_revisar_devolucion_fiado(self):
+        """En la devolución de una venta fiada, lo que sale POR FUERA de la
         cuenta del cliente (efectivo, tarjeta, transferencia o bono) no pasa
         de lo que esa venta se cobró sin fiar, menos lo ya devuelto así. Es
         la misma forma que la regla del efectivo: cada peso vuelve por donde
         entró. Solo para ventas con fiado: la devolución de una venta de
         contado no cambia."""
-        if orden.get('state') == 'draft':
-            return  # se revisa cuando se cobra
-        venta = self._get_refunded_orders(orden)[:1]
+        self.ensure_one()
+        venta = self.lines.refunded_orderline_id.order_id[:1]
         credito = self.env['surtidora.pos.credito']
         fiado = venta.payment_ids.filtered(lambda p: credito._es_fiado(p) and p.amount > 0)
         if not fiado:
             return
         moneda = venta.currency_id
-        tope = self._surtidora_devolvible_fuera_de_cuenta(venta, orden)
-        if float_compare(self._surtidora_fuera_de_cuenta(orden), tope,
-                         precision_rounding=moneda.rounding) > 0:
+        tope = self._surtidora_devolvible_fuera_de_cuenta(venta)
+        # lo que esta devolución entrega por fuera de la cuenta: todo pago que
+        # no es fiado, con su signo, vuelto incluido (positivo en una
+        # devolución pagada de más, porque esos pesos regresan)
+        fuera = -self._surtidora_cobrado_sin_fiar(self)
+        if float_compare(fuera, tope, precision_rounding=moneda.rounding) > 0:
             raise UserError(_(
                 'La venta %(venta)s se fió: %(fiado)s quedaron a la cuenta del '
                 'cliente. Lo devuelto vuelve a esa cuenta con «%(metodo)s», que '
@@ -62,43 +74,17 @@ class PosOrder(models.Model):
                 metodo=fiado[:1].payment_method_id.name,
                 tope=moneda.round(tope)))
 
-    @api.model
-    def _surtidora_fuera_de_cuenta(self, orden):
-        """Lo que esta devolución entrega por fuera de la cuenta del cliente:
-        todo pago que no es fiado, con su signo, más el vuelto.
-
-        El vuelto lo asienta el core después, desde `amount_return` y con
-        ese mismo signo (pos_order.py, _process_payment_lines): positivo en
-        una devolución pagada de más, porque esos pesos regresan. Si la
-        orden se reenvía ya lo trae como línea `is_change` y no se cuenta
-        dos veces."""
-        credito = self.env['surtidora.pos.credito']
-        neto, trae_vuelto = 0.0, False
-        for linea in orden.get('payment_ids') or []:
-            if len(linea) < 3 or linea[0] not in (0, 1):
-                continue
-            valores = linea[2]
-            trae_vuelto = trae_vuelto or bool(valores.get('is_change'))
-            metodo = self.env['pos.payment.method'].browse(
-                valores.get('payment_method_id')).exists()
-            if metodo and not credito._es_metodo_fiado(metodo):
-                neto += valores.get('amount') or 0.0
-        if not trae_vuelto:
-            neto += orden.get('amount_return') or 0.0
-        return -neto
-
-    @api.model
-    def _surtidora_devolvible_fuera_de_cuenta(self, venta, orden):
+    def _surtidora_devolvible_fuera_de_cuenta(self, venta):
         """Lo que la venta se cobró sin fiar (neto del vuelto) menos lo que
         sus otras devoluciones ya entregaron por fuera de la cuenta.
 
         Sin restar lo ya devuelto, dos devoluciones de media venta a bono
         sacarían más de lo que entró sin fiar. La orden que se está
-        revisando no cuenta como «otra» si se reenvía (mismo uuid)."""
+        revisando no cuenta como «otra»."""
+        self.ensure_one()
         dominio = [('lines.refunded_orderline_id', 'in', venta.lines.ids),
-                   ('state', 'not in', ('draft', 'cancel'))]
-        if orden.get('uuid'):
-            dominio.append(('uuid', '!=', orden['uuid']))
+                   ('state', 'not in', ('draft', 'cancel')),
+                   ('id', '!=', self.id)]
         devuelto = sum(max(-self._surtidora_cobrado_sin_fiar(hija), 0.0)
                        for hija in self.search(dominio))
         return max(self._surtidora_cobrado_sin_fiar(venta) - devuelto, 0.0)
