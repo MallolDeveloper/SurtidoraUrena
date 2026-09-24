@@ -37,6 +37,11 @@ cliente con Crédito negativo. Ese crédito (la RINV, o el apunte del cierre
 si no hay factura) REBAJA LA DEUDA, no es bono:
 - Crédito negativo siempre se permite, aunque el cliente no tenga límite
   activo: no crea deuda;
+- en la devolución de una venta fiada, lo que sale por fuera de la cuenta
+  (efectivo, tarjeta, transferencia o bono) no pasa de lo que esa venta se
+  cobró sin fiar, menos lo ya devuelto así (compuerta del servidor al
+  sincronizar la orden, models/pos_order.py). La devolución de una venta
+  de contado no cambia;
 - al cerrar la sesión se concilia contra las deudas abiertas del mismo
   cliente y de la MISMA cuenta por cobrar: primero la de la venta devuelta,
   después FIFO por vencimiento (antes de conciliar los bonos, y otra vez
