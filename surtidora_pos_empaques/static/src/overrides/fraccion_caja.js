@@ -2,8 +2,11 @@ import { patch } from "@web/core/utils/patch";
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 
 /**
- * Fracciones de empaque (RB-09 / REQ-V23): UNA sola verdad para quien las
- * ofrece y para quien las revisa.
+ * Fracciones de empaque (RB-09 / REQ-V23): una sola lista y una sola regla
+ * para quien las OFRECE (el selector de unidad) y quien revisa su PRECIO
+ * (RB-01). La tirilla (orderline_empaque.js) decide aparte cómo ROTULAR la
+ * línea («0.50 Caja»); ese criterio es de presentación, no de precio, y no
+ * se mezcla con este.
  *
  * El selector de unidad ofrece ¼, ½ y ¾ del empaque A PRECIO DE EMPAQUE
  * (½ caja de 18 = 9 paquetes a 43.89, no a los 47.00 del suelto). Pero la
@@ -35,14 +38,22 @@ export function fraccionesDeEmpaque(factor) {
 
 /** Factor del empaque si la línea es una fracción legítima; 0 si no.
  *
- * Legítima = las tres cosas que solo el selector junta:
+ * Legítima = las tres cosas a la vez:
  * - el producto está marcado «La caja se fracciona»;
- * - la línea recuerda el empaque en que se vendió (`surtidora_uom_venta_id`,
- *   que solo ponen el selector y el escaneo del empaque);
+ * - la línea recuerda el empaque en que se vendió (`surtidora_uom_venta_id`).
+ *   Lo ponen el selector (al elegir un empaque o una fracción) y el escaneo
+ *   del código del empaque; la línea suelta no lo lleva;
  * - la cantidad es exactamente una de las fracciones que ese empaque ofrece.
  *
- * Una línea SUELTA de 9 paquetes (tocada como «Paquete», escaneada o con la
- * cantidad tecleada) no lleva empaque y no pasa: sigue siendo suelta. */
+ * Una caja (del selector o escaneada) a la que la cajera le cambia la
+ * cantidad a mano JUSTO a una fracción (18 → 9) también pasa. Se acepta
+ * así porque equivale a elegir «½ caja» en el selector (RB-09): no abre
+ * ningún precio que el selector no dé ya. Cualquier otra cantidad (7, 4.5,
+ * 73) no pasa y la tarifa se consulta con esa cantidad, como cualquier línea.
+ *
+ * Una línea SUELTA de 9 paquetes (tocada como «Paquete», escaneada con el
+ * código del paquete o con la cantidad tecleada) no lleva empaque y no
+ * pasa: sigue siendo suelta. */
 export function factorDeFraccion(linea) {
     const factor = linea.surtidora_uom_venta_id?.relative_factor;
     if (!factor || factor <= 1) {

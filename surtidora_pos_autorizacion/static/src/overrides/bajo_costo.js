@@ -83,9 +83,10 @@ patch(PosOrderline.prototype, {
      *
      * `surtidoraFactorFraccion` lo publica surtidora_pos_empaques, dueño de
      * la regla de qué es una fracción legítima (producto fraccionable +
-     * línea que viene del selector de empaques + cantidad ¼/½/¾ del
-     * factor). Sin ese módulo no hay fracciones y vale undefined. Una línea
-     * suelta de 9 tecleada a mano no pasa esa regla y cotiza con 9. */
+     * línea con empaque —lo ponen el selector y el escaneo del empaque— +
+     * cantidad ¼/½/¾ del factor; ver fraccion_caja.js). Sin ese módulo no
+     * hay fracciones y vale undefined. Una línea suelta de 9 no lleva
+     * empaque, no pasa esa regla y cotiza con 9. */
     get surtiCantidadTarifa() {
         return this.surtidoraFactorFraccion || Math.abs(this.qty) || 1;
     },
