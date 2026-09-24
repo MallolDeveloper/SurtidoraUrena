@@ -166,15 +166,10 @@ patch(OrderPaymentValidation.prototype, {
         const detalle = lineas
             .map((l) => `• ${l.product_id.display_name}: ${fmt(l.surtiPrecioEfectivoConItbis)} ` +
                 `${_t("(lista")} ${fmt(l.surtiPrecioTarifa)})`)
-            .join("
-");
+            .join("\n");
         const abrir = await ask(dialog, {
             title: _t("Precio por debajo de la lista"),
-            body: _t("Estas líneas van por debajo del precio de lista:
-
-%s
-
-" +
+            body: _t("Estas líneas van por debajo del precio de lista:\n\n%s\n\n" +
                 "Un supervisor debe autorizarlas con su PIN.", detalle),
             confirmLabel: _t("Autorizar..."),
             cancelLabel: _t("Corregir la venta"),

@@ -22,6 +22,12 @@ y se elige de un catálogo. Este módulo replica ese control en el POS:
   equivocado; el botón "Return Products" del backend queda para encargados
   (no pasa por el candado del POS).
 
+La devolución en EFECTIVO tiene tope: lo que la venta dejó en efectivo, NETO
+del vuelto (recibido − vuelto), menos lo ya devuelto. Odoo 19 guarda el
+vuelto como un pago negativo en efectivo (`is_change`); contarlo como
+devolución, o ignorarlo en lo pagado, dejaba devolver el billete entero
+—y con pago mixto, en efectivo lo que se cobró con tarjeta.
+
 El pago de la devolución ya lo cubre surtidora_pos_credito: el método
 "Bono / Nota de Crédito" emite el bono nominativo (política 12.4).
 
@@ -36,7 +42,7 @@ NO se rutea mercancía al almacén de Dañados automáticamente: en ADG el
 almacén de la devolución va en blanco y dañados/vencidos son ~12 casos al
 año — eso se resuelve con un traspaso interno manual.
     """,
-    'version': '19.0.2.2.1',
+    'version': '19.0.2.2.2',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

@@ -120,14 +120,14 @@ class PosSession(models.Model):
         # «Devoluciones en efectivo» de arriba con este bloque, y lo que deja
         # ver que un bono o una nota de crédito NO tocaron la gaveta: sin
         # esto, el total mezcla dinero con papel y no cuadra contra nada.
-        # Se calcula sobre los pagos NEGATIVOS —no sobre las órdenes de total
-        # negativo— para que la parte en efectivo dé exactamente la misma
-        # cifra que el bloque del efectivo, incluso si una orden mezcla
-        # devolución y venta nueva.
+        # Se calcula sobre los PAGOS de devolución —no sobre las órdenes de
+        # total negativo— y con el mismo dominio que el bloque del efectivo
+        # (el vuelto fuera), para que la parte en efectivo dé exactamente la
+        # misma cifra, incluso si una orden mezcla devolución y venta nueva.
         grupos_devol = sesion.env['pos.payment']._read_group(
             [('session_id', '=', sesion.id),
-             ('pos_order_id.state', 'in', ESTADOS_CAPTURADOS),
-             ('amount', '<', 0)],
+             ('pos_order_id.state', 'in', ESTADOS_CAPTURADOS)]
+            + self._surtidora_dominio_pagos(devoluciones=True),
             ['payment_method_id'], ['amount:sum'])
         devol_por_metodo = [
             {'nombre': metodo.name, 'monto': monto,
@@ -225,12 +225,40 @@ class PosSession(models.Model):
         return datos
 
     @api.model
-    def _surtidora_efectivo_por_signo(self, sesion):
-        """Lo que ENTRÓ y lo que SALIÓ de la gaveta, ya separados.
+    def _surtidora_dominio_pagos(self, devoluciones):
+        """Los pagos de VENTA o de DEVOLUCIÓN: el vuelto no es devolución.
 
-        Un pago negativo en el POS es dinero que sale: no hay otra forma de
-        registrar una devolución en efectivo. El vuelto no cuenta aquí —
-        viaja en `amount_return`, no como línea de pago.
+        En Odoo 19 el vuelto se guarda como un pago más en efectivo
+        (`is_change`, «devolver»), con el signo CONTRARIO al del pago al que
+        pertenece: negativo en una venta (el cliente dio 500 por 480) y
+        positivo en una devolución cobrada de más. Mirar solo el signo lo
+        confundía con una devolución: una caja sin reembolsos salía con
+        «Devoluciones en efectivo −2,368.83», que era puro vuelto (REQ-V17).
+
+        Por eso el lado lo da el signo del pago leído AL REVÉS si es vuelto:
+        devolución es el pago negativo que no es vuelto, más el vuelto
+        positivo que la netea; venta, lo contrario. Los dos dominios son
+        complementarios (solo quedan fuera los pagos en cero), así que entre
+        ambos suman todos los pagos: el esperado no se mueve.
+
+        Se escriben los dos explícitos, sin negar uno con `'!'`: la negación
+        de un booleano que viniera en NULL lo dejaría fuera de ambos lados.
+        """
+        salida, entrada = ('<', '>') if devoluciones else ('>', '<')
+        return ['|',
+                '&', ('amount', salida, 0), ('is_change', '=', False),
+                '&', ('amount', entrada, 0), ('is_change', '=', True)]
+
+    @api.model
+    def _surtidora_efectivo_por_signo(self, sesion):
+        """Lo que ENTRÓ por ventas y lo que SALIÓ por devoluciones, separados.
+
+        Un pago negativo que no es vuelto es dinero que sale: no hay otra
+        forma de registrar una devolución en efectivo. El vuelto se netea
+        contra el pago al que pertenece (ver `_surtidora_dominio_pagos`), así
+        «Ventas en efectivo» es lo VENDIDO (recibido − vuelto), no el billete
+        que entregó el cliente. Las dos mitades siguen sumando todos los
+        pagos en efectivo, así que el esperado no cambia en un centavo.
 
         La salida se devuelve CON su signo (negativa, o cero), igual que los
         montos de `devol_por_metodo` con los que tiene que amarrar. Así la
@@ -241,14 +269,15 @@ class PosSession(models.Model):
                 ('pos_order_id.state', 'in', ESTADOS_CAPTURADOS),
                 ('payment_method_id.is_cash_count', '=', True)]
 
-        def sumar(signo):
+        def sumar(dominio):
             # groupby vacío: una sola fila con el total, o ninguna si no hay
-            # pagos de ese signo (y `amount:sum` puede venir en None)
+            # pagos (y `amount:sum` puede venir en None)
             grupos = sesion.env['pos.payment']._read_group(
-                base + [('amount', signo, 0)], [], ['amount:sum'])
+                base + dominio, [], ['amount:sum'])
             return (grupos[0][0] if grupos else 0.0) or 0.0
 
-        return sumar('>'), sumar('<')
+        return (sumar(self._surtidora_dominio_pagos(devoluciones=False)),
+                sumar(self._surtidora_dominio_pagos(devoluciones=True)))
 
     @api.model
     def _surtidora_movimientos_caja(self, sesion):

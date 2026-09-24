@@ -13,6 +13,11 @@ REQ-P04 / REQ-I08 del levantamiento:
   empaque — con su código de barras y su precio según la lista elegida
   (formato 57x32mm, rollo Zebra típico; el ZPL exacto se ajustará cuando la
   sesión de inventario confirme el modelo de impresora).
+- La lista viene puesta: la que fija el Precio de venta de la ficha
+  (surtidora_precios → Ajustes de Ventas; en Surtidora, Precio 4 (Detalle)).
+  Antes se tomaba la primera por secuencia, «Default», que no tiene reglas:
+  el empaque salía a Precio de venta × factor (NEAM24: 720 en vez de 570).
+  Se puede elegir otra lista en el asistente.
 
 LA SIMBOLOGÍA SALE DEL CÓDIGO, NO AL REVÉS
 ------------------------------------------
@@ -34,11 +39,15 @@ imprimiría 0028661704211 — trece dígitos que no están en ninguna ficha y qu
 al escanear no encuentran nada. Comprobado comparando las imágenes byte a
 byte contra las de Code128.
     """,
-    'version': '19.0.1.1.1',
+    'version': '19.0.1.1.2',
     'category': 'Inventory',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
-    'depends': ['product'],
+    # surtidora_precios: define en la compañía la lista que fija el Precio de
+    # venta, que es la lista por defecto de las etiquetas. Se instalan juntos
+    # (CORTE.md, paso 3) y no trae nada nuevo: su única otra dependencia,
+    # sale_management, ya está instalada.
+    'depends': ['product', 'surtidora_precios'],
     'data': [
         'security/ir.model.access.csv',
         'data/ir_sequence.xml',

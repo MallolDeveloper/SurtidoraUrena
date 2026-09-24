@@ -27,6 +27,15 @@ Este módulo lo replica sobre la sesión del POS:
   además mezclaba efectivo con bonos —que no tocan la gaveta—, por lo que
   no cuadraba contra nada; ahora se desglosa por forma de pago y la fila de
   efectivo da exactamente la misma cifra que el bloque del efectivo.
+- El VUELTO no es una devolución. Odoo 19 lo guarda como un pago negativo
+  en efectivo (`is_change`, «devolver»), y separar solo por signo lo
+  sumaba a «Devoluciones en efectivo» (una caja sin reembolsos salía con
+  −2,368.83) mientras «Ventas en efectivo» enseñaba el billete recibido.
+  Ahora el vuelto se netea contra el pago al que pertenece: ventas en
+  efectivo = recibido − vuelto, y devoluciones solo las de verdad. El
+  esperado y la diferencia no cambian (los sigue calculando Odoo). Si alguna
+  vez se da vuelto en efectivo de un pago con tarjeta, ese vuelto resta de
+  «Ventas en efectivo» (puede salir negativo): es plata que salió de la gaveta.
 - El conteo por denominación del popup de cierre se PERSISTE estructurado
   (campo JSON en la sesión): el POS nativo solo lo dejaba como texto en las
   notas de cierre, imposible de tabular en un reporte.
@@ -40,7 +49,7 @@ Este módulo lo replica sobre la sesión del POS:
 El motor arma todos los datos (surtidora_datos_cuadre); la plantilla solo
 pinta — mismo estándar motor/pantalla del resto de módulos Surtidora.
     """,
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.2.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
