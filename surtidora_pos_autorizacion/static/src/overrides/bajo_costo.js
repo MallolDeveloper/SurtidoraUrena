@@ -72,12 +72,32 @@ patch(PosOrderline.prototype, {
         return this.price_unit * (1 - (this.getDiscount() || 0) / 100);
     },
 
-    /** Precio que la tarifa del pedido asigna a esta línea, CON su cantidad
-     * y con ITBIS — la misma base que surtiPrecioEfectivoConItbis. */
+    /** Cantidad con la que se le pregunta a la tarifa por esta línea.
+     *
+     * Normalmente la de la línea. La excepción es la FRACCIÓN de empaque
+     * (RB-09): ½ caja de 18 son 9 paquetes que se venden a precio de caja
+     * a propósito, y con 9 la regla por cantidad (mín. 18) no aplica — la
+     * tarifa devolvía el suelto (47.00 contra 43.89) y TODA media caja
+     * pedía PIN por una rebaja que nadie hizo. La fracción se cotiza como
+     * el empaque completo; si la cajera la baja de ahí, RB-01 salta igual.
+     *
+     * `surtidoraFactorFraccion` lo publica surtidora_pos_empaques, dueño de
+     * la regla de qué es una fracción legítima (producto fraccionable +
+     * línea que viene del selector de empaques + cantidad ¼/½/¾ del
+     * factor). Sin ese módulo no hay fracciones y vale undefined. Una línea
+     * suelta de 9 tecleada a mano no pasa esa regla y cotiza con 9. */
+    get surtiCantidadTarifa() {
+        return this.surtidoraFactorFraccion || Math.abs(this.qty) || 1;
+    },
+
+    /** Precio que la tarifa del pedido asigna a esta línea, con la cantidad
+     * de surtiCantidadTarifa y con ITBIS — la misma base que
+     * surtiPrecioEfectivoConItbis. Es también el `precio_lista` que queda en
+     * la bitácora: el servidor no lo recalcula. */
     get surtiPrecioTarifa() {
         try {
             const tmpl = this.product_id.product_tmpl_id;
-            return tmpl.getPrice(this.order_id.pricelist_id, Math.abs(this.qty) || 1, 0);
+            return tmpl.getPrice(this.order_id.pricelist_id, this.surtiCantidadTarifa, 0);
         } catch {
             return 0;
         }
