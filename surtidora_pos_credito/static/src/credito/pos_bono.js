@@ -62,8 +62,9 @@ patch(PaymentScreen.prototype, {
         }
         const monto = orden.getDefaultAmountDueToPayIn(paymentMethod);
         if (monto <= 0) {
-            // DEVOLUCIÓN: el bono se emite (queda como saldo a favor al
-            // cerrar sesión); no requiere saldo previo
+            // DEVOLUCIÓN: el bono se emite; no requiere saldo previo. Sin
+            // factura queda como saldo a favor al cerrar la sesión; si la
+            // orden se factura, la nota de crédito (RINV) ya es el bono
             return await super.addNewPaymentLine(...arguments);
         }
         const v = await veredictoBono(this.pos, cliente.id, monto);

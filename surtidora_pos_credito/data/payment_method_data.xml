@@ -10,8 +10,10 @@
 
     <!-- REQ-V18 / política 12.4: el bono por devolución vive como nota de
          crédito abierta del cliente y se APLICA como crédito en la compra
-         nueva (pago mixto). También pay_later + split: al cierre de sesión
-         genera el apunte por cliente que CxC concilia contra la NC. -->
+         nueva (pago mixto). También pay_later + split. Venta SIN factura:
+         al cierre genera el apunte por cliente que se concilia contra la
+         NC. Venta FACTURADA: la factura queda abierta por el bono y el
+         cierre la concilia contra la NC (pos.session). -->
     <record id="metodo_pago_bono" model="pos.payment.method">
         <field name="name">Bono / Nota de Crédito</field>
         <field name="split_transactions" eval="True"/>

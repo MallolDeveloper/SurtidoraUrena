@@ -38,11 +38,30 @@ El pago de la devolución ya lo cubre surtidora_pos_credito: el método
   distingue "teclee la cantidad" de "esta venta ya se devolvió completa",
   que manda a la cajera a sitios opuestos.
 
+Devolución sin factura FACTURADA (cliente empresa, que Odoo 19 factura
+solo, y toda venta cuando entre el módulo fiscal): Odoo decide el documento
+solo por "is_refund", que marcan el botón "Reembolsar" y la devolución del
+backend. La línea
+negativa tecleada a mano salía como FACTURA de total positivo que le cobraba
+al cliente lo devuelto (−100 en efectivo = el cliente quedaba debiendo 200).
+Ahora una orden con total negativo sale como NOTA DE CRÉDITO (RINV), con las
+mismas líneas: pagada en efectivo queda conciliada, pagada con bono queda
+como saldo a favor. La mixta con total ≥ 0 sigue siendo factura. No
+cambian el inventario, el margen ni los reportes del POS; en contabilidad
+la devolución aparece como nota de crédito, que es lo correcto.
+Con l10n_do_accounting la nota de crédito exigirá el NCF modificado: lo
+pondrá el futuro surtidora_pos_fiscal con el NCF de ADG de la venta de
+origen. Por eso l10n_do_accounting NO debe activarse en producción antes
+de surtidora_pos_fiscal: sin el NCF modificado, estas devoluciones no
+sincronizan. Las mixtas (factura o nota con líneas negativas) también
+quedan como caso de ese módulo. En el asistente «Facturar» del backend,
+facturar una devolución sin factura aparte de las ventas.
+
 NO se rutea mercancía al almacén de Dañados automáticamente: en ADG el
 almacén de la devolución va en blanco y dañados/vencidos son ~12 casos al
 año — eso se resuelve con un traspaso interno manual.
     """,
-    'version': '19.0.2.2.2',
+    'version': '19.0.2.2.3',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
