@@ -16,11 +16,12 @@ tocar/escanear un producto:
 - Balance del cliente al seleccionarlo (REQ-V02): vencido, por vencer, a
   favor y lo fiado en sesiones abiertas. Una orden facturada cuenta por su
   factura (no otra vez como fiado en sesión) y la parte pagada con bono no
-  sale como deuda y como bono usado a la vez.
+  sale como deuda y como bono usado a la vez. La devolución de un fiado
+  (DC-5) sale ya rebajando la deuda, no como saldo a favor.
 
 Los datos los arma el servidor en una sola llamada; el panel solo pinta.
     """,
-    'version': '19.0.1.3.1',
+    'version': '19.0.1.3.2',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

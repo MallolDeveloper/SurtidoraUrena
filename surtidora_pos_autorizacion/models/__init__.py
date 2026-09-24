@@ -2,3 +2,5 @@
 from . import pos_load
 from . import autorizacion_pos
 from . import pos_order
+from . import sale_order
+from . import stock_picking

@@ -27,6 +27,13 @@ caja**: ½ caja de 18 = 9 und a 440.00 (tarifa caja 48.89), no a precio suelto.
 - La línea lleva `price_type = manual` para que el POS no recalcule la
   fracción a precio suelto.
 - La unidad base NUNCA se fracciona (RB-09).
+- RB-01 (bajo lista, `surtidora_pos_autorizacion`) compara la fracción
+  contra la tarifa del empaque COMPLETO: ½ caja a precio de caja no pide PIN;
+  bajarla de ese precio sí. Cuenta como fracción la línea que recuerda su
+  empaque (selector o escaneo del empaque) y cuya cantidad es ¼/½/¾ del
+  factor; también una caja a la que se le cambia la cantidad a mano justo a
+  una fracción, que es lo mismo que elegirla en el selector. Una línea suelta
+  (sin empaque) de 9 sigue comparándose contra el precio suelto.
 
 ## Diseño
 
@@ -41,6 +48,9 @@ caja**: ½ caja de 18 = 9 und a 440.00 (tarifa caja 48.89), no a precio suelto.
   unidad de venta. Va junto con «Agrupar en el punto de venta» encendido en las
   unidades base (`scripts/corte/configurar_unidades_caja.py`): sin este patch,
   una caja y un suelto del mismo producto se fundirían.
+- `static/src/overrides/fraccion_caja.js`: la lista de fracciones (¼/½/¾) y la
+  regla de qué línea es una fracción legítima. La usan el selector y, vía
+  `PosOrderline.surtidoraFactorFraccion`, la regla RB-01 del mostrador.
 
 ## Prueba post-merge
 
@@ -50,3 +60,6 @@ caja**: ½ caja de 18 = 9 und a 440.00 (tarifa caja 48.89), no a precio suelto.
 4. Escanear un barcode de empaque real (los migrados del ensayo #1) → mismo efecto
 5. Escanear dos veces el mismo producto suelto → UNA línea con cantidad 2
 6. Escanear la caja y después el suelto del mismo producto → DOS líneas
+7. Elegir «½ Caja de 18» → 9 paquetes a precio de caja → al cobrar NO sale
+   «Precio por debajo de la lista». Bajarle el precio a esa línea → SÍ sale
+   (RB-01, `surtidora_pos_autorizacion`)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -111,6 +111,21 @@ class SaleOrderLine(models.Model):
         return self.currency_id.compare_amounts(
             self.price_reduce_taxexcl, self._costo_en_uom()) < 0
 
+    def _bajo_costo_bloqueado(self):
+        """RB-08 tal como lo aplican el candado de confirmar y la revalidación:
+        la línea va bajo costo, la compañía no lo permite y no hay excepción
+        que la cubra.
+
+        Aquí no hay excepciones: en oficina el PIN no aplica. Las pone la caja,
+        que autoriza la venta bajo costo con motivo + PIN, y las suma
+        surtidora_pos_autorizacion para la cotización que se cobró en caja
+        (P19). Por eso el candado y la revalidación preguntan aquí y no a
+        _es_bajo_costo: si cada uno midiera por su lado, una línea amparada
+        pasaría el confirmar y después no se podría ni bajar su cantidad."""
+        self.ensure_one()
+        return (not self.company_id.surtidora_permitir_bajo_costo
+                and self._es_bajo_costo())
+
     # ------------------------------------------------------------------
     # El candado no puede vivir SOLO en action_confirm
     # ------------------------------------------------------------------
@@ -124,8 +139,22 @@ class SaleOrderLine(models.Model):
     # que las dos reglas se vuelven a comprobar al escribir. En borrador no
     # hace falta: ahí manda action_confirm, y bloquear antes impediría armar
     # la cotización.
+    #
+    # Y al CREAR: agregar una línea a una orden confirmada no pasa por write
+    # (Odoo solo deja el mensaje «Extra line with…» y sale_stock lanza su
+    # entrega). Sin esto, una línea nueva bajo lista o bajo costo se entregaba
+    # y se facturaba sin PIN, y el freno de P19 no la veía porque nunca lleva
+    # la marca de la caja. Las líneas que el sistema agrega solo entran en
+    # cantidad 0 (anticipo de pos_sale, extra de sale_stock) o sin producto
+    # (secciones), y esas no piden nada.
     _CAMPOS_QUE_MUEVEN_EL_DINERO = (
         'price_unit', 'discount', 'product_uom_qty', 'product_uom_id', 'product_id')
+
+    @api.model_create_multi
+    def create(self, lista_valores):
+        lineas = super().create(lista_valores)
+        lineas._revalidar_orden_confirmada()
+        return lineas
 
     def write(self, valores):
         resultado = super().write(valores)
@@ -137,8 +166,7 @@ class SaleOrderLine(models.Model):
         for linea in self:
             if linea.order_id.state not in ('sale', 'done'):
                 continue
-            if (linea._es_bajo_costo()
-                    and not linea.company_id.surtidora_permitir_bajo_costo):
+            if linea._bajo_costo_bloqueado():
                 raise UserError(_(
                     'No se puede dejar %(producto)s BAJO COSTO en una orden ya '
                     'confirmada: precio %(precio).2f sin ITBIS contra un costo '

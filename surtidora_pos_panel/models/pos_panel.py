@@ -56,6 +56,12 @@ class PosPanel(models.AbstractModel):
             ('company_id', '=', self.env.company.id),
         ])
         residual = self._residual_sin_bono_pendiente(env, comercial, lineas)
+        # DC-5: la devolución de un fiado rebaja la deuda al cerrar la caja;
+        # desde ya se pinta así, igual que verificar_bono
+        plan = self._plan_devoluciones(env, comercial)
+        for linea, monto in plan['deudas'].items():
+            if linea in residual:
+                residual[linea] -= monto
         # Débitos y créditos por separado: un pago a cuenta o una NC sin
         # conciliar (residual NEGATIVO) es saldo a favor, no deuda "vencida".
         # Y "vencido" exige vencimiento REAL: las líneas sin date_maturity
@@ -68,8 +74,8 @@ class PosPanel(models.AbstractModel):
         # los bonos ya aplicados en sesiones abiertas consumen el saldo a
         # favor aunque la contabilidad aún no lo registre (misma regla que
         # verificar_bono del módulo de crédito)
-        a_favor = max(0.0, a_favor - self._bonos_usados(env, comercial))
-        en_sesion = self._credito_en_sesion(env, comercial)
+        a_favor = max(0.0, a_favor - self._bonos_usados(env, comercial) + plan['a_favor'])
+        en_sesion = self._credito_en_sesion(env, comercial) + plan['en_sesion']
         return {
             'partner_id': cliente.id,
             'total': deuda + en_sesion - a_favor,
@@ -109,6 +115,16 @@ class PosPanel(models.AbstractModel):
         if 'surtidora.pos.credito' not in env:
             return 0.0
         return env['surtidora.pos.credito']._bonos_usados(comercial)
+
+    @api.model
+    def _plan_devoluciones(self, env, comercial):
+        """Lo que el cierre hará con la devolución de un fiado (DC-5,
+        surtidora_pos_credito._plan_devoluciones): cuánto baja el saldo a
+        favor y lo fiado hoy, y cuánto se le rebaja a cada deuda. Sin ese
+        módulo no hay Crédito ni devoluciones a cuenta."""
+        if 'surtidora.pos.credito' not in env:
+            return {'a_favor': 0.0, 'en_sesion': 0.0, 'deudas': {}}
+        return env['surtidora.pos.credito']._plan_devoluciones(comercial)
 
     @api.model
     def _residual_sin_bono_pendiente(self, env, comercial, lineas):
