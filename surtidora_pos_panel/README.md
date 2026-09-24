@@ -15,6 +15,21 @@ está siempre a la vista, sin popups.
 Si no hay cliente en la orden, el panel lo dice y pide seleccionarlo — la
 sección de historial es el anti-"a mí me lo pusiste a menos".
 
+## Balance del cliente (REQ-V02)
+
+Al seleccionar el cliente, `balance_cliente` devuelve vencido / por vencer /
+a favor / fiado en sesión / límite. Reglas con órdenes **facturadas** (toda
+venta llevará NCF con el módulo fiscal):
+
+- Lo fiado a Crédito en una orden facturada ya es su factura abierta: no se
+  suma otra vez como "en sesión". Con `surtidora_pos_credito` instalado la
+  cifra sale del mismo método que usa el candado (`_credito_en_sesion`).
+- Venta facturada pagada con bono, con la sesión abierta: la parte del bono
+  se descuenta de la factura (el cierre la concilia contra la NC) y del
+  saldo a favor — no aparece como deuda y como bono usado a la vez.
+- Devolución facturada con bono: su RINV ya es el saldo a favor; no se
+  vuelve a sumar.
+
 ## Diseño
 
 - `models/pos_panel.py`: el servidor arma TODO en una llamada

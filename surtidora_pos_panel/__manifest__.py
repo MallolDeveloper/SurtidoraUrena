@@ -13,10 +13,14 @@ tocar/escanear un producto:
   de POS y de facturación backend.
 - Precios por unidad/empaque con su equivalente (REQ-V03).
 - Existencia disponible por almacén (REQ-V04).
+- Balance del cliente al seleccionarlo (REQ-V02): vencido, por vencer, a
+  favor y lo fiado en sesiones abiertas. Una orden facturada cuenta por su
+  factura (no otra vez como fiado en sesión) y la parte pagada con bono no
+  sale como deuda y como bono usado a la vez.
 
 Los datos los arma el servidor en una sola llamada; el panel solo pinta.
     """,
-    'version': '19.0.1.3.0',
+    'version': '19.0.1.3.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

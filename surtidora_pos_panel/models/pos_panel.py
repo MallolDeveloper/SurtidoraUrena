@@ -55,25 +55,20 @@ class PosPanel(models.AbstractModel):
             ('amount_residual', '!=', 0.0),
             ('company_id', '=', self.env.company.id),
         ])
+        residual = self._residual_sin_bono_pendiente(env, comercial, lineas)
         # Débitos y créditos por separado: un pago a cuenta o una NC sin
         # conciliar (residual NEGATIVO) es saldo a favor, no deuda "vencida".
         # Y "vencido" exige vencimiento REAL: las líneas sin date_maturity
         # (p. ej. el asiento de cierre de sesión del POS) van a "por vencer"
         # para no pintar de rojo deuda de ayer con acuerdo a 30 días.
-        vencido = sum(l.amount_residual for l in lineas
-                      if l.amount_residual > 0 and l.date_maturity and l.date_maturity < hoy)
-        deuda = sum(l.amount_residual for l in lineas if l.amount_residual > 0)
-        a_favor = -sum(l.amount_residual for l in lineas if l.amount_residual < 0)
+        vencido = sum(r for l, r in residual.items()
+                      if r > 0 and l.date_maturity and l.date_maturity < hoy)
+        deuda = sum(r for r in residual.values() if r > 0)
+        a_favor = -sum(r for r in residual.values() if r < 0)
         # los bonos ya aplicados en sesiones abiertas consumen el saldo a
-        # favor aunque la contabilidad aún no lo registre (simetría con
+        # favor aunque la contabilidad aún no lo registre (misma regla que
         # verificar_bono del módulo de crédito)
-        if 'surtidora_es_bono' in env['pos.payment.method']._fields:
-            a_favor = max(0.0, a_favor - sum(env['pos.payment'].search([
-                ('payment_method_id.surtidora_es_bono', '=', True),
-                ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
-                ('pos_order_id.session_id.state', '!=', 'closed'),
-                ('pos_order_id.company_id', '=', self.env.company.id),
-            ]).mapped('amount')))
+        a_favor = max(0.0, a_favor - self._bonos_usados(env, comercial))
         en_sesion = self._credito_en_sesion(env, comercial)
         return {
             'partner_id': cliente.id,
@@ -88,20 +83,55 @@ class PosPanel(models.AbstractModel):
     @api.model
     def _credito_en_sesion(self, env, comercial):
         """Crédito fiado HOY que la contabilidad aún no ve: los pagos
-        "cuenta cliente" (pay_later) solo generan asientos al CERRAR la
-        sesión del POS. Sin este término, un cliente podría exceder su
-        límite comprando varias veces el mismo día."""
+        "cuenta cliente" (pay_later) de órdenes SIN factura solo generan
+        asientos al CERRAR la sesión del POS. Sin este término, un cliente
+        podría exceder su límite comprando varias veces el mismo día.
+
+        Con factura publicada la deuda ya es la factura abierta (ya está en
+        las líneas por cobrar): sumarla aquí la contaba doble."""
+        if 'surtidora.pos.credito' in env:
+            # la MISMA cifra que usa el candado de crédito (una sola regla)
+            return env['surtidora.pos.credito']._credito_en_sesion(comercial)
         dominio = [  # pay_later = metodo SIN diario (type no es almacenado)
             ('payment_method_id.journal_id', '=', False),
             ('pos_order_id.partner_id.commercial_partner_id', '=', comercial.id),
             ('pos_order_id.session_id.state', '!=', 'closed'),
             ('pos_order_id.company_id', '=', self.env.company.id),
+            '|', ('pos_order_id.account_move', '=', False),
+            ('pos_order_id.account_move.state', '!=', 'posted'),
         ]
-        # los BONOS (surtidora_pos_credito) aplican saldo a favor del
-        # cliente, no son deuda nueva — se excluyen si el módulo está
-        if 'surtidora_es_bono' in env['pos.payment.method']._fields:
-            dominio.append(('payment_method_id.surtidora_es_bono', '=', False))
         return sum(env['pos.payment'].search(dominio).mapped('amount'))
+
+    @api.model
+    def _bonos_usados(self, env, comercial):
+        """Bono aplicado en sesiones abiertas que la CxC aún no refleja
+        (surtidora_pos_credito, REQ-V18). Sin ese módulo no hay bonos."""
+        if 'surtidora.pos.credito' not in env:
+            return 0.0
+        return env['surtidora.pos.credito']._bonos_usados(comercial)
+
+    @api.model
+    def _residual_sin_bono_pendiente(self, env, comercial, lineas):
+        """Residual de cada línea por cobrar, descontando de las facturas
+        del POS la parte que un bono ya pagó y que el cierre de sesión va a
+        conciliar contra la NC (surtidora_pos_credito._bono_por_conciliar).
+
+        Sin esto, una venta FACTURADA pagada con bono con la sesión abierta
+        salía dos veces: como deuda (la factura abierta) y como bono ya
+        usado (restado del saldo a favor). Se descuenta por vencimiento,
+        como lo aplicará la conciliación."""
+        residual = {linea: linea.amount_residual for linea in lineas}
+        if 'surtidora.pos.credito' not in env:
+            return residual
+        credito = env['surtidora.pos.credito']
+        for pendiente in credito._bono_por_conciliar(credito._pagos_bono_facturados(comercial)):
+            resto = pendiente['tope']
+            for linea in pendiente['lineas'].sorted(lambda l: (l.date_maturity or l.date, l.id)):
+                if linea in residual and resto > 0:
+                    aplicado = min(resto, residual[linea])
+                    residual[linea] -= aplicado
+                    resto -= aplicado
+        return residual
 
     def _precios_por_unidad(self, producto, pricelist):
         """Precio de la unidad base y de cada empaque, con el equivalente por
