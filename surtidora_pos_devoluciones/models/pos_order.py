@@ -24,6 +24,7 @@ factura que le cobra al cliente: ver «La factura».
 """
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools.misc import format_amount
 
 
 class PosOrder(models.Model):
@@ -84,7 +85,7 @@ class PosOrder(models.Model):
             raise UserError(_(
                 'Devolver %(monto)s en efectivo necesita la clave de un '
                 'supervisor. Pídala en la pantalla de pago.',
-                monto=self.env.company.currency_id.round(efectivo)))
+                monto=self._surtidora_monto_legible(efectivo)))
 
     # ------------------------------------------------------------------
     # Las cuatro reglas
@@ -99,7 +100,7 @@ class PosOrder(models.Model):
         if sesion and not self._surtidora_hay_efectivo(sesion, efectivo):
             return _('La caja no tiene %(monto)s en efectivo. Esta devolución '
                      'no se puede pagar en efectivo.',
-                     monto=self.env.company.currency_id.round(efectivo))
+                     monto=self._surtidora_monto_legible(efectivo))
         if not original:
             # Devolución sin factura: no hay contra qué comprobar la caja, el
             # día ni lo que se pagó. Se deja pasar bajo la responsabilidad del
@@ -128,14 +129,29 @@ class PosOrder(models.Model):
                      dia=dia)
         disponible = self._surtidora_efectivo_devolvible(original)
         if efectivo > disponible + 0.001:
+            pagado = self._surtidora_pagado_en_efectivo(original)
             return _('De esta venta solo quedaron %(pagado)s en efectivo (lo '
                      'pagado menos el vuelto), y ya se devolvieron '
                      '%(devuelto)s. El resto lo tramita contabilidad.',
-                     pagado=self.env.company.currency_id.round(
-                         self._surtidora_pagado_en_efectivo(original)),
-                     devuelto=self.env.company.currency_id.round(
-                         self._surtidora_pagado_en_efectivo(original) - disponible))
+                     pagado=self._surtidora_monto_legible(pagado),
+                     devuelto=self._surtidora_monto_legible(pagado - disponible))
         return None
+
+    @api.model
+    def _surtidora_monto_legible(self, monto):
+        """El monto como lo lee la cajera: «RD$ 1,640.00», no «1640.0».
+
+        Solo para ARMAR el texto de los avisos. `currency_id.round()` devuelve
+        un número, y el número impreso en el aviso salía sin símbolo, sin
+        separador de miles y con un solo decimal («solo quedaron 640.0»).
+        `format_amount` es el formato de moneda estándar de Odoo: símbolo y
+        decimales de la moneda, separadores del idioma del usuario.
+
+        Las comparaciones del tope y de la gaveta siguen con el número crudo:
+        esto es texto y no se compara con nada. Moneda de la compañía, la
+        misma con la que se miden esos topes (Surtidora opera en una sola).
+        """
+        return format_amount(self.env, monto, self.env.company.currency_id)
 
     @api.model
     def _surtidora_efectivo_devolvible(self, original):
