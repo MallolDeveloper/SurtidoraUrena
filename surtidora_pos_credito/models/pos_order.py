@@ -18,6 +18,7 @@ bono. El candado de crédito deja pasar siempre un monto negativo
 from odoo import _, api, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare
+from odoo.tools.misc import format_amount
 
 
 class PosOrder(models.Model):
@@ -70,9 +71,9 @@ class PosOrder(models.Model):
                 'transferencia o bono) solo se pueden devolver %(tope)s: lo que '
                 'esa venta se cobró sin fiar, menos lo ya devuelto así.',
                 venta=venta.pos_reference or venta.name,
-                fiado=moneda.round(sum(fiado.mapped('amount'))),
+                fiado=format_amount(self.env, sum(fiado.mapped('amount')), moneda),
                 metodo=fiado[:1].payment_method_id.name,
-                tope=moneda.round(tope)))
+                tope=format_amount(self.env, tope, moneda)))
 
     def _surtidora_devolvible_fuera_de_cuenta(self, venta):
         """Lo que la venta se cobró sin fiar (neto del vuelto) menos lo que
