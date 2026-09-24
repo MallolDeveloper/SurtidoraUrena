@@ -18,8 +18,12 @@ Punto 5 de la reunión con el cliente (7-ago-2026):
 
 La comparación es precio tecleado vs costo del producto (sin ITBIS), la misma
 regla RB-08 ya validada en el backend.
+
+- RB-01: al COBRAR, las líneas por debajo del precio de lista (menos la
+  tolerancia de la compañía) piden motivo del catálogo + PIN de supervisor,
+  sin doble confirmación, y quedan en la misma bitácora.
     """,
-    'version': '19.0.2.0.0',
+    'version': '19.0.2.0.1',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
