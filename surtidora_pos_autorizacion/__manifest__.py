@@ -33,7 +33,7 @@ regla RB-08 ya validada en el backend.
   no se entrega ni se factura desde oficina hasta que se autorice o se
   corrija.
     """,
-    'version': '19.0.2.0.1',
+    'version': '19.0.2.1.0',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',

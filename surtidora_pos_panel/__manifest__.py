@@ -21,7 +21,7 @@ tocar/escanear un producto:
 
 Los datos los arma el servidor en una sola llamada; el panel solo pinta.
     """,
-    'version': '19.0.1.3.1',
+    'version': '19.0.1.3.2',
     'category': 'Sales/Point of Sale',
     'author': 'Mallol Consulting - Smerlin Ramos',
     'license': 'OPL-1',
