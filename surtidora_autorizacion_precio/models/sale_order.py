@@ -33,24 +33,34 @@ class SaleOrder(models.Model):
         """Candado al confirmar: primero el bloqueo duro (RB-08), luego las
         autorizaciones pendientes (RB-01)."""
         for order in self:
-            bajo_costo = order._lineas_bajo_costo()
-            if bajo_costo:
-                raise UserError(_(
-                    'Venta BAJO COSTO bloqueada (regla de la empresa, sin '
-                    'excepciones):\n%s',
-                    '\n'.join('  • %s: precio %.2f sin ITBIS < costo %.2f' % (
-                        l.product_id.display_name, l.price_reduce_taxexcl, l._costo_en_uom())
-                        for l in bajo_costo)))
-            pendientes = order._lineas_pendientes()
-            if pendientes:
-                raise UserError(_(
-                    'Hay precios por debajo de la lista sin autorizar:\n%s\n\n'
-                    'Use el botón "Autorizar precios" — un supervisor debe '
-                    'aprobar con su PIN.',
-                    '\n'.join('  • %s: %.2f (lista: %.2f)' % (
-                        l.product_id.display_name, l.price_reduce_taxinc, l._precio_de_lista())
-                        for l in pendientes)))
+            order._validar_precios_al_confirmar()
         return super().action_confirm()
+
+    def _validar_precios_al_confirmar(self):
+        """El candado de precios de action_confirm (RB-08 y RB-01).
+
+        Vive aparte para que otra vía que confirme la orden decida qué hacer
+        con él sin copiar las reglas: la caja confirma la cotización al
+        cobrarla (pos_sale) y ahí un error no puede tumbar una venta que ya
+        se cobró (surtidora_pos_autorizacion, P19)."""
+        self.ensure_one()
+        bajo_costo = self._lineas_bajo_costo()
+        if bajo_costo:
+            raise UserError(_(
+                'Venta BAJO COSTO bloqueada (regla de la empresa, sin '
+                'excepciones):\n%s',
+                '\n'.join('  • %s: precio %.2f sin ITBIS < costo %.2f' % (
+                    l.product_id.display_name, l.price_reduce_taxexcl, l._costo_en_uom())
+                    for l in bajo_costo)))
+        pendientes = self._lineas_pendientes()
+        if pendientes:
+            raise UserError(_(
+                'Hay precios por debajo de la lista sin autorizar:\n%s\n\n'
+                'Use el botón "Autorizar precios" — un supervisor debe '
+                'aprobar con su PIN.',
+                '\n'.join('  • %s: %.2f (lista: %.2f)' % (
+                    l.product_id.display_name, l.price_reduce_taxinc, l._precio_de_lista())
+                    for l in pendientes)))
 
     def action_abrir_autorizacion_precios(self):
         """Abre el wizard donde el supervisor aprueba con su PIN (REQ-V07/V27)."""
