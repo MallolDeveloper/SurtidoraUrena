@@ -17,6 +17,10 @@ Las reglas de la devolución en EFECTIVO, tal como las fijó el cliente:
 
 Un bono, una nota de crédito o una venta a crédito todavía sin pagar no
 mueven dinero de la gaveta: pasan sin clave.
+
+Y si la orden se FACTURA (cliente empresa hoy; toda venta con el módulo
+fiscal), una devolución sin factura sale como nota de crédito, no como
+factura que le cobra al cliente: ver «La factura».
 """
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -280,6 +284,64 @@ class PosOrder(models.Model):
             return False
         fila.consumida = True
         return fila
+
+    # ------------------------------------------------------------------
+    # La factura
+    # ------------------------------------------------------------------
+    def _prepare_invoice_vals(self):
+        """Una devolución sin factura FACTURADA sale como nota de crédito.
+
+        El core elige el documento solo por `is_refund` (pos_order.py:869), y
+        `is_refund` lo marcan el botón «Reembolsar» del POS y la devolución
+        del backend («Return Products»). La
+        línea negativa tecleada a mano (la «devolución sin factura» de ADG)
+        llega con is_refund=False, así que el core arma una FACTURA. Como ya
+        volteó las cantidades porque el total es negativo (:1846-1862), esa
+        factura sale POSITIVA: se publica sin error y le COBRA al cliente lo
+        que se le devolvía (−1 BOKA15 en efectivo: INV de 100 + el débito del
+        pago de −100 = el cliente queda debiendo 200). Con todas las ventas
+        facturadas (NCF), esto pasaría en cada devolución sin factura.
+
+        Solo cambia el tipo de documento, y va DESPUÉS de super() a propósito.
+        Las líneas ya se calcularon para out_invoice sin is_refund
+        (qty_sign=+1, :208), el mismo signo que el core usa para un reembolso
+        nativo en out_refund: la nota sale con cantidades y total positivos,
+        igual que RINV/2026/00006 (orden 53). Pedir out_refund ANTES haría
+        que :210 volteara otra vez las cantidades y la nota saldría negativa.
+
+        No se marca is_refund: el core guarda los subtotales de un reembolso
+        nativo con otro signo, y voltearlo solo en el servidor cambia el
+        margen (orden 31: 27.97 → 197.47) y el reporte de ventas.
+
+        Fiscal: con l10n_do_accounting la nota de crédito exige el NCF
+        modificado (account_move.py:789-791). Lo pondrá el futuro
+        surtidora_pos_fiscal con el NCF de ADG de la venta de origen, y tiene
+        que depender de este módulo (y de l10n_do_pos si algún día se usa:
+        lee move_type después de su super(), pos_order.py:349, y por debajo
+        de este vería out_invoice).
+        """
+        valores = super()._prepare_invoice_vals()
+        if valores.get('move_type') == 'out_invoice' \
+                and self._surtidora_es_nota_de_credito():
+            valores['move_type'] = 'out_refund'
+        return valores
+
+    def _surtidora_es_nota_de_credito(self):
+        """¿El core ya volteó las cantidades de TODAS estas órdenes?
+
+        Es el mismo predicado del core (`amount_total < 0.0`,
+        pos_order.py:1846): el documento se voltea exactamente cuando se
+        voltearon las líneas. Una mixta con total ≥ 0 sigue siendo factura
+        (con su línea negativa); con total < 0, nota de crédito.
+
+        `all()` y no la suma: en un lote con signos mezclados cada orden
+        viene volteada por su cuenta y ningún tipo de documento cuadra, así
+        que se deja lo nativo. La caja factura de a una orden, pero el
+        asistente «Facturar» del backend (pos.make.invoice, consolidado por
+        defecto) puede juntar varias: una devolución sin factura mezclada
+        con ventas en ese lote sale mal, así que se facturan por separado.
+        """
+        return bool(self) and all(orden.amount_total < 0.0 for orden in self)
 
     # ------------------------------------------------------------------
     @api.model_create_multi
