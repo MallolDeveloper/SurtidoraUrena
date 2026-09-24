@@ -22,6 +22,8 @@ regla RB-08 ya validada en el backend.
 - RB-01: al COBRAR, las líneas por debajo del precio de lista (menos la
   tolerancia de la compañía) piden motivo del catálogo + PIN de supervisor,
   sin doble confirmación, y quedan en la misma bitácora.
+- Una fracción de empaque (¼/½/¾, RB-09 de surtidora_pos_empaques) se
+  compara contra la tarifa del empaque completo, que es su precio legítimo.
     """,
     'version': '19.0.2.0.1',
     'category': 'Sales/Point of Sale',
