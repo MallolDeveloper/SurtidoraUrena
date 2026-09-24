@@ -111,6 +111,21 @@ class SaleOrderLine(models.Model):
         return self.currency_id.compare_amounts(
             self.price_reduce_taxexcl, self._costo_en_uom()) < 0
 
+    def _bajo_costo_bloqueado(self):
+        """RB-08 tal como lo aplican el candado de confirmar y la revalidación:
+        la línea va bajo costo, la compañía no lo permite y no hay excepción
+        que la cubra.
+
+        Aquí no hay excepciones: en oficina el PIN no aplica. Las pone la caja,
+        que autoriza la venta bajo costo con motivo + PIN, y las suma
+        surtidora_pos_autorizacion para la cotización que se cobró en caja
+        (P19). Por eso el candado y la revalidación preguntan aquí y no a
+        _es_bajo_costo: si cada uno midiera por su lado, una línea amparada
+        pasaría el confirmar y después no se podría ni bajar su cantidad."""
+        self.ensure_one()
+        return (not self.company_id.surtidora_permitir_bajo_costo
+                and self._es_bajo_costo())
+
     # ------------------------------------------------------------------
     # El candado no puede vivir SOLO en action_confirm
     # ------------------------------------------------------------------
@@ -137,8 +152,7 @@ class SaleOrderLine(models.Model):
         for linea in self:
             if linea.order_id.state not in ('sale', 'done'):
                 continue
-            if (linea._es_bajo_costo()
-                    and not linea.company_id.surtidora_permitir_bajo_costo):
+            if linea._bajo_costo_bloqueado():
                 raise UserError(_(
                     'No se puede dejar %(producto)s BAJO COSTO en una orden ya '
                     'confirmada: precio %(precio).2f sin ITBIS contra un costo '

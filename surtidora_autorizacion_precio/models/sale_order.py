@@ -25,9 +25,7 @@ class SaleOrder(models.Model):
     def _lineas_bajo_costo(self):
         """Líneas vendidas bajo costo — bloqueo duro para todos (RB-08)."""
         self.ensure_one()
-        if self.company_id.surtidora_permitir_bajo_costo:
-            return self.order_line.browse()
-        return self.order_line.filtered(lambda l: l._es_bajo_costo())
+        return self.order_line.filtered(lambda l: l._bajo_costo_bloqueado())
 
     def action_confirm(self):
         """Candado al confirmar: primero el bloqueo duro (RB-08), luego las
