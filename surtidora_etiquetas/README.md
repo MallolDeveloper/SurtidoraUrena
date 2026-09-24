@@ -18,6 +18,15 @@ precio y código de barras — una etiqueta por la unidad base y **una por cada
 empaque** con su propio barcode y su precio real (misma mecánica de la venta:
 caja a 880, no base×factor).
 
+La lista viene puesta: la que fija el Precio de venta de la ficha (Ajustes de
+Ventas, campo de `surtidora_precios`; en Surtidora es **Precio 4 (Detalle)**).
+Se puede cambiar en el asistente para imprimir con otra lista. Si en Ajustes
+no hay lista configurada, el campo queda vacío y hay que elegirla.
+
+> Por qué: antes se tomaba la primera lista por secuencia, «Default», que no
+> tiene reglas — el empaque salía a Precio de venta × factor (NEAM24, paquete
+> de 24: 720.00 en vez de 570.00). Defecto de la prueba del 28-sep.
+
 ## Pendiente para afinar (sesión de inventario)
 
 - Marca/modelo de la Zebra y el formato actual de etiqueta (⬜ del
@@ -27,7 +36,10 @@ caja a 880, no base×factor).
 
 ## Prueba post-merge
 
-1. Instalar desde Apps
+1. Actualizar el módulo (en una base limpia: instalar desde Apps)
 2. Productos → seleccionar varios sin barcode → acción "Generar código interno"
 3. Seleccionar GALLETAS GUARINA SALADA → "Imprimir etiquetas (base + empaques)"
+   → la lista ya dice Precio 4 (Detalle) sin tocarla
    → PDF: etiqueta Paquete a 55 con su EAN + etiqueta Caja de 18 a 880
+4. NECTAR DEL AMOR 24/1 (NEAM24) → Unidad a 30.00 y Paquete de 24 a 570.00
+   (con «Default» salía 720.00)
